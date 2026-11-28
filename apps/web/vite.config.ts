@@ -20,6 +20,7 @@ export default defineConfig({
     //    Scans src/routes/ and auto-generates src/routeTree.gen.ts
     tanstackRouter({
       target: "react",
+      autoCodeSplitting: true,
       routesDirectory: "./src/routes",
       ...(desktop
         ? {
@@ -89,7 +90,24 @@ export default defineConfig({
     tsconfigPaths: true,
     alias: { "@schoolhub/platform": platformPath },
   },
-  build: desktop ? { outDir: "dist-desktop", sourcemap: false } : {},
+  build: {
+    // Hidden source maps are uploaded to the error tracker by CI and never referenced by the served files.
+    ...(desktop ? { outDir: "dist-desktop", sourcemap: false } : { sourcemap: "hidden" as const }),
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            // Tiny helpers used by every component. Without their own group they were folded into the
+            // recharts chunk, which then had to load on every page.
+            { name: "ui-helpers", test: /node_modules[\\/](clsx|tailwind-merge|class-variance-authority)[\\/]/, priority: 40 },
+            { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 30 },
+            { name: "tanstack", test: /node_modules[\\/]@tanstack[\\/]/, priority: 20 },
+            { name: "recharts", test: /node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor)[\\/]/, priority: 10 },
+          ],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     // Proxy API & auth calls to NestJS backend during development.

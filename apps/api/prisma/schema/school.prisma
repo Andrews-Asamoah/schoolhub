@@ -5,6 +5,7 @@
 model School {
   syncDevices SyncDevice[]
   attendanceExcuseRequests AttendanceExcuseRequest[]
+  payrollPaymentDetails PayrollPaymentDetails[]
   studentDeletionRequests StudentDeletionRequest[]
   schoolRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_school")
   financeBankReconciliations FinanceBankReconciliation[] @relation("FinanceBankReconciliation_school")
@@ -14,6 +15,7 @@ model School {
   notificationSettings SchoolNotificationSettings?
   notificationPreferences NotificationPreference[]
   notificationDeliveries NotificationDelivery[]
+  pushDevices DeviceToken[]
   notificationDailyUsage NotificationDailyUsage[]
   id             String   @id @default(cuid())
   organizationId String   @unique
@@ -45,6 +47,7 @@ model School {
   attendanceBatchReplays      AttendanceBatchReplay[]
   assessmentTemplates         AssessmentTemplate[]
   reportCardVersions          ReportCardVersion[]
+  reportRecommendationDrafts  ReportRecommendationDraft[]
   externalExamSessions ExternalExamSession[]
   externalExamImports ExternalExamImport[]
   bills                       Bill[]
@@ -165,6 +168,7 @@ model UserProfile {
 }
 
 model Student {
+  busDecisions BusTermDecision[]
   attendanceExcuseRequests AttendanceExcuseRequest[]
   id                 String        @id @default(cuid())
   profileId          String        @unique
@@ -222,6 +226,7 @@ model Student {
   @@index([schoolId, deletedAt])
   @@map("students")
   reportCardVersions ReportCardVersion[]
+  reportRecommendationDrafts ReportRecommendationDraft[]
   externalExamCandidates ExternalExamCandidate[]
 }
 
@@ -263,6 +268,8 @@ model Teacher {
   clubs                 Club[]
   payslips              Payslip[]
   timetableEntries      TimetableEntry[]
+
+  payrollPaymentDetails PayrollPaymentDetails?
 
   // Scoped to Academic Year
   assignments          TeacherAssignment[]
@@ -308,6 +315,8 @@ model Staff {
   department Department? @relation("StaffDepartment", fields: [departmentId], references: [id])
   documents  Document[]
   payslips   Payslip[]
+
+  payrollPaymentDetails PayrollPaymentDetails?
 
   // Scoped to Academic Year
   assignments StaffAssignment[]

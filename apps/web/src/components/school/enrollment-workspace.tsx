@@ -9,7 +9,7 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { CreateEnrollmentInput } from "@schoolhub/shared";
+import { formatPersonName, type CreateEnrollmentInput } from "@schoolhub/shared";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -154,11 +154,11 @@ export function EnrollmentWorkspace({
       id: "student",
       header: "Student",
       value: (enrollment) =>
-        `${enrollment.student.profile.firstName} ${enrollment.student.profile.lastName} (${enrollment.student.studentId})`,
+        `${formatPersonName(enrollment.student.profile)} (${enrollment.student.studentId})`,
       cell: (enrollment) => (
         <>
           <p className="text-sm font-semibold text-foreground">
-            {enrollment.student.profile.firstName} {enrollment.student.profile.lastName}
+            {formatPersonName(enrollment.student.profile)}
           </p>
           <p className="text-xs text-muted-foreground">{enrollment.student.studentId}</p>
         </>
@@ -375,15 +375,14 @@ export function EnrollmentWorkspace({
                         checked={selectedIds.has(student.id)}
                         onChange={() => toggleStudent(student.id)}
                         className="size-4 rounded border-border accent-primary"
-                        aria-label={`Select ${student.profile.firstName} ${student.profile.lastName}`}
+                        aria-label={`Select ${formatPersonName(student.profile)}`}
                       />
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                         <GraduationCap className="size-4" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-foreground">
-                          {student.profile.firstName} {student.profile.lastName}
-                          {student.profile.otherNames ? ` ${student.profile.otherNames}` : ""}
+                          {formatPersonName(student.profile)}
                         </span>
                         <span className="mt-0.5 block text-xs text-muted-foreground">
                           {student.admissionNumber || student.studentId}

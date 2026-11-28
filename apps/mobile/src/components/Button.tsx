@@ -1,14 +1,8 @@
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "@/components/Typography";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
-import { elevation, fonts, radius, useTheme } from "@/theme/theme";
+import { fonts, radius, spacing, useTheme } from "@/theme/theme";
 
 type Variant = "primary" | "secondary" | "ghost" | "destructive";
 
@@ -19,7 +13,6 @@ type Props = {
   loading?: boolean;
   disabled?: boolean;
   icon?: ReactNode;
-  /** Stretch to the full width of the parent (default true). */
   block?: boolean;
   haptic?: boolean;
 };
@@ -34,103 +27,80 @@ export function Button({
   block = true,
   haptic = true,
 }: Props) {
-  const { colors, accent, heroGradient, reduceMotion, scheme } = useTheme();
-  const scale = useSharedValue(1);
-  const style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-  const inactive = disabled || loading;
-
-  const fg =
-    variant === "primary"
-      ? "#FFFFFF"
-      : variant === "destructive"
-        ? colors.destructiveForeground
-        : variant === "secondary"
-          ? colors.foreground
-          : accent;
-
-  const content = (
-    <View style={styles.row}>
-      {loading ? <ActivityIndicator color={fg} /> : icon}
-      <Text style={[styles.label, { color: fg, fontFamily: fonts.bold }]}>
-        {label}
-      </Text>
-    </View>
-  );
+  const { colors, heroGradient } = useTheme();
+  const inactive = !!(disabled || loading);
+  const theme = {
+    primary: {
+      bg: heroGradient?.[0] ?? colors.primary,
+      fg: heroGradient ? "#FFFFFF" : colors.primaryForeground,
+      edge: "transparent",
+    },
+    secondary: { bg: colors.card, fg: colors.foreground, edge: colors.input },
+    ghost: { bg: "transparent", fg: colors.primary, edge: "transparent" },
+    destructive: {
+      bg: colors.destructive,
+      fg: colors.destructiveForeground,
+      edge: "transparent",
+    },
+  }[variant];
 
   return (
-    <Animated.View
-      style={[
-        block && { alignSelf: "stretch" },
-        { borderRadius: radius.xl },
-        variant === "primary" && !inactive
-          ? elevation(scheme, 1, heroGradient?.[0] ?? accent)
-          : null,
-        style,
-        inactive && { opacity: 0.5 },
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: inactive, busy: !!loading }}
+      accessibilityLabel={label}
+      disabled={inactive}
+      onPress={() => {
+        if (haptic) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress?.();
+      }}
+      style={({ pressed }) => [
+        styles.button,
+        block ? styles.block : styles.inline,
+        {
+          backgroundColor:
+            inactive && !loading
+              ? colors.muted
+              : pressed && variant === "ghost"
+                ? colors.muted
+                : theme.bg,
+          borderColor: inactive && !loading ? "transparent" : theme.edge,
+          opacity: pressed ? 0.84 : 1,
+        },
       ]}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ disabled: !!inactive, busy: !!loading }}
-        accessibilityLabel={label}
-        disabled={inactive}
-        onPressIn={() => {
-          if (!reduceMotion)
-            scale.set(withSpring(0.97, { damping: 18, stiffness: 320 }));
-        }}
-        onPressOut={() => {
-          scale.set(withSpring(1, { damping: 18, stiffness: 320 }));
-        }}
-        onPress={() => {
-          if (haptic)
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onPress?.();
-        }}
-        style={[
-          styles.base,
-          variant === "secondary" && {
-            backgroundColor: colors.card,
-            borderColor: colors.input,
-            borderWidth: 1.5,
-          },
-          variant === "destructive" && { backgroundColor: colors.destructive },
-          variant === "ghost" && { backgroundColor: "transparent" },
-        ]}
-      >
-        {variant === "primary" ? (
-          <LinearGradient
-            colors={heroGradient ?? [accent, accent]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-        ) : null}
-        {content}
-      </Pressable>
-    </Animated.View>
+      <View style={styles.content}>
+        {loading ? <ActivityIndicator color={theme.fg} /> : icon}
+        <Text
+          style={[
+            styles.label,
+            { color: inactive && !loading ? colors.mutedForeground : theme.fg },
+          ]}
+        >
+          {label}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  base: {
-    minHeight: 56,
-    borderRadius: radius.xl,
+  block: { alignSelf: "stretch" },
+  inline: { alignSelf: "flex-start" },
+  button: {
+    minHeight: 50,
+    borderRadius: radius.md,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 14,
-  },
+  content: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   label: {
-    fontSize: 16,
-    letterSpacing: -0.1,
+    fontFamily: fonts.semibold,
+    fontSize: 15,
+    lineHeight: 20,
     flexShrink: 1,
     textAlign: "center",
   },

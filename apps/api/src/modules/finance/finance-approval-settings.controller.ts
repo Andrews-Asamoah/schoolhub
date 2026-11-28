@@ -11,7 +11,7 @@ import { AuditActorParam } from "../../common/audit/audit-actor.decorator.js";
 import type { AuditActor } from "../../common/audit/audit.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import { FINANCE_APPROVAL_SETTINGS_READ_ROLES, FINANCE_APPROVAL_SETTINGS_WRITE_ROLES } from "./finance.permissions.js";
-import { FINANCE_APPROVAL_CONTROLS, approvalSettingInputSchema, type ApprovalSettingInput } from "./finance-approval-settings.js";
+import { FINANCE_APPROVAL_CONTROLS, approvalSettingInputSchema, payrollRunApprovalSettingInputSchema, type ApprovalSettingInput } from "./finance-approval-settings.js";
 import { FinanceApprovalSettingsService } from "./finance-approval-settings.service.js";
 
 const controlSchema = z.enum(FINANCE_APPROVAL_CONTROLS);
@@ -33,8 +33,10 @@ export class FinanceApprovalSettingsController {
     @CurrentSchoolRole() role: string | undefined,
     @AuditActorParam() actor: AuditActor,
     @Param("control", new ZodValidationPipe(controlSchema)) control: z.infer<typeof controlSchema>,
-    @Body(new ZodValidationPipe(approvalSettingInputSchema)) body: ApprovalSettingInput,
+    @Body() body: unknown,
   ) {
-    return this.settings.update(school.id, actor, role, user.role === "superAdmin", control, body);
+    const schema = control === "PAYROLL_RUN" ? payrollRunApprovalSettingInputSchema : approvalSettingInputSchema;
+    const input = new ZodValidationPipe(schema).transform(body) as ApprovalSettingInput;
+    return this.settings.update(school.id, actor, role, user.role === "superAdmin", control, input);
   }
 }

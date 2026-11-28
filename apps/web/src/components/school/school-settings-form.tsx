@@ -41,13 +41,13 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState(() => toValues(school));
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
-  const [saved, setSaved] = useState(false);
 
   const save = useMutation({
+    meta: { success: "School details saved." },
     mutationFn: (body: unknown) => apiFetch("/schools/current", { method: "PATCH", body: JSON.stringify(body) }),
     onSuccess: async () => {
       setEditing(false);
-      setSaved(true);
+
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["school"] }),
         queryClient.invalidateQueries({ queryKey: ["tenant"] }),
@@ -58,7 +58,7 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
   function startEditing() {
     setValues(toValues(school));
     setErrors({});
-    setSaved(false);
+
     save.reset();
     setEditing(true);
   }
@@ -111,9 +111,7 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
         )}
       </div>
 
-      {saved && !editing && (
-        <p role="status" className="mt-3 text-xs text-success">School details saved.</p>
-      )}
+
 
       {editing ? (
         <form onSubmit={submit} noValidate className="mt-5 space-y-4">
@@ -140,9 +138,7 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
           <p className="text-[11px] text-muted-foreground">
             The school code ({school.code}) and subdomain ({school.subdomain}) identify your school and cannot be changed here.
           </p>
-          {save.error && (
-            <p role="alert" className="text-xs text-destructive">{save.error.message}</p>
-          )}
+
           <div className="flex gap-2">
             <button
               type="submit"

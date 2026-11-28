@@ -114,3 +114,55 @@ test("real Better Auth revocation uses the captured pre-logout credential", asyn
   });
   assert.equal(authorization, "Bearer revocation-fixture");
 });
+
+test("native verification only carries the temporary two-factor cookie", async () => {
+  let revision = 0;
+  let token = null;
+  const hooks = createTokenHooks({
+    getRevision: () => revision,
+    async setToken(value) {
+      token = value;
+      return ++revision;
+    },
+  });
+  const client = createAuthClient({
+    baseURL: "https://auth-tests.schoolhub.invalid",
+    fetchOptions: {
+      onRequest: hooks.onRequest,
+      onSuccess: hooks.onSuccess,
+      customFetchImpl: async (url, options) => {
+        const headers = new Headers(options.headers);
+        assert.equal(headers.get("expo-origin"), "schoolhub://");
+        assert.equal(options.credentials, "omit");
+        if (String(url).endsWith("sign-in/email")) {
+          assert.equal(headers.get("cookie"), null);
+          return new Response('{"twoFactorRedirect":true}', {
+            headers: {
+              "Content-Type": "application/json",
+              "set-auth-token": "unverified-fixture",
+              "Set-Cookie":
+                "better-auth.session_token=; Max-Age=0, __Secure-better-auth.two_factor=challenge%2Eproof; HttpOnly",
+            },
+          });
+        }
+        assert.equal(
+          headers.get("cookie"),
+          "__Secure-better-auth.two_factor=challenge%2Eproof",
+        );
+        return response();
+      },
+    },
+  });
+  await client.signIn.email({
+    email: "fixture@example.test",
+    password: "fixture-password",
+  });
+  assert.equal(token, null);
+  assert.equal(hooks.hasChallenge(), true);
+  await client.$fetch("/two-factor/verify-totp", {
+    method: "POST",
+    body: { code: "123456" },
+  });
+  assert.equal(token, "response-fixture");
+  assert.equal(hooks.hasChallenge(), false);
+});

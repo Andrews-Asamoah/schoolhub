@@ -25,6 +25,8 @@ const AcademicYearSetup = lazy(() => import("@/components/school/academic-year-s
 const SchoolLogoUploader = lazy(() => import("@/components/school/school-logo-uploader").then((m) => ({ default: m.SchoolLogoUploader })));
 const SubjectsWorkspace = lazy(() => import("@/components/school/subjects-workspace").then((m) => ({ default: m.SubjectsWorkspace })));
 const TimetableWorkspace = lazy(() => import("@/components/school/timetable-workspace").then((m) => ({ default: m.TimetableWorkspace })));
+const ReportCardArchiveWorkspace = lazy(() => import("@/components/school/report-card-archive-workspace").then((m) => ({ default: m.ReportCardArchiveWorkspace })));
+const HeadteacherReportApprovalsWorkspace = lazy(() => import("@/components/school/headteacher-report-approvals-workspace").then((m) => ({ default: m.HeadteacherReportApprovalsWorkspace })));
 const FinanceApprovalSettingsWorkspace = lazy(() => import("@/components/school/finance-approval-settings-workspace").then((m) => ({ default: m.FinanceApprovalSettingsWorkspace })));
 const TeamRoleWorkspace = lazy(() => import("@/components/school/team-role-workspace").then((m) => ({ default: m.TeamRoleWorkspace })));
 const ClassesWorkspace = lazy(() => import("@/components/school/classes-workspace").then((m) => ({ default: m.ClassesWorkspace })));
@@ -45,10 +47,12 @@ const ClubsWorkspace = lazy(() => import("@/components/school/clubs-workspace").
 const TeacherPortalWorkspace = lazy(() => import("@/components/portal/teacher-portal-workspace").then((m) => ({ default: m.TeacherPortalWorkspace })));
 const AccountantPortalWorkspace = lazy(() => import("@/components/portal/accountant-portal-workspace").then((m) => ({ default: m.AccountantPortalWorkspace })));
 const ExpenseManagementWorkspace = lazy(() => import("@/components/portal/expense-management-workspace").then((m) => ({ default: m.ExpenseManagementWorkspace })));
+const TeacherPayrollWorkspace = lazy(() => import("@/components/portal/teacher-payroll-workspace").then((m) => ({ default: m.TeacherPayrollWorkspace })));
 const PayrollManagementWorkspace = lazy(() => import("@/components/portal/payroll-management-workspace").then((m) => ({ default: m.PayrollManagementWorkspace })));
 const FeeReminderWorkspace = lazy(() => import("@/components/portal/fee-reminder-workspace").then((m) => ({ default: m.FeeReminderWorkspace })));
 const InventoryManagementWorkspace = lazy(() => import("@/components/portal/inventory-management-workspace").then((m) => ({ default: m.InventoryManagementWorkspace })));
 const FeeStructuresWorkspace = lazy(() => import("@/components/portal/fee-structures-workspace").then((m) => ({ default: m.FeeStructuresWorkspace })));
+const BusUsersWorkspace = lazy(() => import("@/components/portal/bus-users-workspace").then(m => ({ default: m.BusUsersWorkspace })));
 const ConcessionsWorkspace = lazy(() => import("@/components/portal/concessions-workspace").then((m) => ({ default: m.ConcessionsWorkspace })));
 const FinanceAuditWorkspace = lazy(() => import("@/components/portal/finance-audit-workspace").then((m) => ({ default: m.FinanceAuditWorkspace })));
 const StudentStatementWorkspace = lazy(() => import("@/components/portal/student-statement-workspace").then((m) => ({ default: m.StudentStatementWorkspace })));
@@ -229,7 +233,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   return (
     <>
       {activeRole !== "student" &&
-        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "fees", "concessions", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "student-statements", "term-end-review", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "documents", "messages", "notifications", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
+        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "teacher-payroll", "accountant-portal", "fees", "concessions", "bus-users", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "student-statements", "term-end-review", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "documents", "messages", "notifications", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
           pageId,
         ) && (
         <WorkspacePageHeading
@@ -261,6 +265,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "finance-reports" && <AccountantPortalWorkspace defaultTab="reports" />}
           {pageId === "expenses" && <ExpenseManagementWorkspace />}
           {pageId === "payroll" && <PayrollManagementWorkspace />}
+          {pageId === "teacher-payroll" && <TeacherPayrollWorkspace />}
           {pageId === "fee-reminders" && <FeeReminderWorkspace />}
           {pageId === "inventory" && <InventoryManagementWorkspace />}
           {pageId === "documents" && <DocumentsWorkspace />}
@@ -319,6 +324,8 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             )
           )}
           {pageId === "assessment-tracking" && <AssessmentTrackingWorkspace role={activeRole ?? undefined} />}
+          {pageId === "report-approvals" && <HeadteacherReportApprovalsWorkspace />}
+          {pageId === "report-cards" && <ReportCardArchiveWorkspace role={activeRole ?? undefined} />}
           {pageId === "reports" && (
             activeRole === "student" ? <StudentReportView /> : <SchoolReportsWorkspace />
           )}
@@ -326,6 +333,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             activeRole === "student" ? <StudentAttendanceView /> : <><AttendanceWorkspace query={classesQuery} /><AbsenceRequestsWorkspace /></>
           )}
           {pageId === "concessions" && <ConcessionsWorkspace />}
+          {pageId === "bus-users" && <BusUsersWorkspace />}
           {pageId === "signatures" && <SignaturesWorkspace />}
           {pageId === "fees" && (
             activeRole === "student" ? (

@@ -1,4 +1,6 @@
+import { Alert } from "react-native";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -25,10 +27,12 @@ import {
 import { TeacherReports } from "@/features/teacher/Reports";
 import TeacherClubs from "@/features/teacher/Clubs";
 import { ApiError } from "@/lib/api-error";
-import * as registerQueue from "@/lib/register-queue";
+import * as teacherApi from "@/api/teacher";
+import * as mockRegisterQueue from "@/lib/register-queue";
 import * as session from "@/lib/session";
 const mockQuery = jest.fn();
 const mockMutate = jest.fn();
+let mockRunMutation = false;
 const mockParams = {
   classId: "c",
   subjectId: "math",
@@ -39,16 +43,39 @@ jest.mock("@/features/teacher/queries", () => ({
   useTeacherQuery: (parts: unknown[]) => mockQuery(parts),
 }));
 jest.mock("@/features/shared/mutations", () => ({
-  useScopedMutation: () => ({
-    mutateAsync: mockMutate,
+  useScopedMutation: (mutate: (payload: unknown) => unknown) => ({
+    mutateAsync: (payload: unknown) => {
+      const result = mockMutate(payload);
+      return mockRunMutation ? mutate(payload) : result;
+    },
     isPending: false,
     isError: false,
     isSuccess: false,
     reset: jest.fn(),
   }),
 }));
+jest.mock("@/features/teacher/RegisterSync", () => ({
+  useRegisterSync: () => {
+    const { useState } = jest.requireActual<typeof import("react")>("react");
+    const [pending, setPending] = useState(0);
+    return {
+      pending,
+      notice: null,
+      sync: async () =>
+        (
+          await mockRegisterQueue.flushRegisterQueue({
+            subdomain: "school",
+            send: async () => {},
+          })
+        ).remaining,
+      refreshCount: async () =>
+        setPending(await mockRegisterQueue.pendingRegisterCount("school")),
+    };
+  },
+}));
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockParams,
+  useFocusEffect: jest.fn(),
   router: { push: jest.fn(), back: jest.fn() },
 }));
 jest.mock("@/components/HeroCard", () => ({
@@ -86,6 +113,10 @@ jest.mock("@shopify/flash-list", () => ({
   },
 }));
 jest.mock("@/components/Dialogs", () => ({ ConfirmDialog: () => null }));
+jest.mock("expo-crypto", () => ({
+  randomUUID:
+    jest.requireActual<typeof import("node:crypto")>("node:crypto").randomUUID,
+}));
 jest.mock("@/lib/register-queue", () => ({
   ...jest.requireActual("@/lib/register-queue"),
   enqueueRegister: jest.fn(async () => true),
@@ -115,6 +146,8 @@ jest.mock("@/components/Surface", () => {
   const { View } =
     jest.requireActual<typeof import("react-native")>("react-native");
   return {
+    Surface: ({ children }: { children: ReactNode }) =>
+      React.createElement(View, null, children),
     Card: ({ children }: { children: ReactNode }) =>
       React.createElement(View, null, children),
   };
@@ -167,6 +200,7 @@ jest.mock("@/components/Skeleton", () => {
   return { SkeletonRow: () => React.createElement(Text, null, "Loading") };
 });
 jest.mock("@/components/Charts", () => ({
+  BarChart: () => null,
   ProgressRing: ({ label }: { label: string }) => {
     const React = jest.requireActual<typeof import("react")>("react");
     const { Text } =
@@ -252,8 +286,14 @@ const calendar = {
 };
 const fixture: Record<string, unknown> = {
   overview: teaching,
-  classes: [{ id: "c", name: "JHS 1" }],
   timetable: { entries: [] },
+  "timetable-options": {
+    academicYear: null,
+    academicYears: [],
+    classes: [],
+    teachers: [],
+    classrooms: [],
+  },
   roster: [
     {
       id: "p",
@@ -340,7 +380,12 @@ const fixture: Record<string, unknown> = {
   clubs: [{ id: "club", name: "STEM club", isActive: true, description: null }],
   pupil: {
     id: "p",
-    profile: { firstName: "Pupil", lastName: "Fixture" },
+    profile: {
+      firstName: "Pupil",
+      otherNames: "Sample",
+      lastName: "Fixture",
+      image: "https://school.example/pupil.webp",
+    },
     class: { name: "JHS 1" },
     house: null,
     status: "ACTIVE",
@@ -358,6 +403,21 @@ beforeEach(() => {
     ...baseQuery,
     data: fixture[parts[0]!],
   }));
+});
+test("teacher classes reuse the assigned classes from the home query", async () => {
+  await render(<TeacherClasses />);
+  expect(screen.getByText("View JHS 1 roster")).toBeVisible();
+  expect(mockQuery).toHaveBeenCalledWith(["overview"]);
+  expect(mockQuery.mock.calls.every(([parts]) => parts[0] === "overview")).toBe(
+    true,
+  );
+});
+test("student details display the full name and school photo", async () => {
+  await render(<TeacherPupil />);
+  expect(screen.getByText("Pupil Sample Fixture")).toBeVisible();
+  expect(
+    screen.getByRole("image", { name: "Pupil Sample Fixture photo" }),
+  ).toBeVisible();
 });
 const screens = [
   TeacherHome,
@@ -403,7 +463,12 @@ test("register edits are immediate but not sent until explicit save", async () =
   await fireEvent.press(
     screen.getByRole("button", { name: "Pupil Fixture: PRESENT" }),
   );
-  expect(screen.getByText("Current status: PRESENT")).toBeVisible();
+  expect(
+    screen.getByRole("button", {
+      name: "Pupil Fixture: PRESENT",
+      selected: true,
+    }),
+  ).toBeVisible();
   await fireEvent.press(screen.getByRole("button", { name: "Save register" }));
   await waitFor(() =>
     expect(mockMutate).toHaveBeenCalledWith({
@@ -439,7 +504,12 @@ test("a rejected register save keeps changes visibly unsaved", async () => {
   );
   await fireEvent.press(screen.getByRole("button", { name: "Save register" }));
   await waitFor(() => expect(mockMutate).toHaveBeenCalled());
-  expect(screen.getByText("Current status: ABSENT")).toBeVisible();
+  expect(
+    screen.getByRole("button", {
+      name: "Pupil Fixture: ABSENT",
+      selected: true,
+    }),
+  ).toBeVisible();
   expect(screen.getByText(/1 unsaved marks/)).toBeVisible();
 });
 test("score entry rejects a value above the component maximum", async () => {
@@ -450,7 +520,7 @@ test("score entry rejects a value above the component maximum", async () => {
   );
   await fireEvent.press(screen.getByRole("button", { name: "Save marks" }));
   await waitFor(() =>
-    expect(screen.getByText(/Marks were not saved/)).toBeVisible(),
+    expect(screen.getByText(/outside the allowed range/)).toBeVisible(),
   );
   expect(mockMutate).not.toHaveBeenCalled();
 });
@@ -525,18 +595,22 @@ test("closed school day disables marking", async () => {
 });
 describe("offline register saves", () => {
   beforeEach(() => {
+    mockRunMutation = true;
     jest.spyOn(session, "useSession").mockReturnValue({
       subdomain: "school",
       status: "ready",
       activeRole: "teacher",
     } as never);
     jest
-      .mocked(registerQueue.enqueueRegister)
+      .mocked(mockRegisterQueue.enqueueRegister)
       .mockClear()
       .mockResolvedValue(true);
-    jest.mocked(registerQueue.pendingRegisterCount).mockResolvedValue(0);
+    jest.mocked(mockRegisterQueue.pendingRegisterCount).mockResolvedValue(0);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    mockRunMutation = false;
+    jest.restoreAllMocks();
+  });
   async function markAndSave() {
     await render(<RegisterScreen />);
     await fireEvent.press(
@@ -548,36 +622,155 @@ describe("offline register saves", () => {
     await waitFor(() => expect(mockMutate).toHaveBeenCalled());
   }
   test("an unknown-outcome failure is queued with its idempotency key", async () => {
-    mockMutate.mockRejectedValue(new TypeError("Network request failed"));
-    jest.mocked(registerQueue.pendingRegisterCount).mockResolvedValue(1);
+    jest
+      .spyOn(teacherApi, "saveRegister")
+      .mockRejectedValue(new TypeError("Network request failed"));
+    jest.mocked(mockRegisterQueue.pendingRegisterCount).mockResolvedValue(1);
     await markAndSave();
     await waitFor(() =>
-      expect(registerQueue.enqueueRegister).toHaveBeenCalledWith({
-        key: expect.stringMatching(/^reg-/),
-        subdomain: "school",
-        batch: {
-          date: expect.any(String),
-          records: [{ studentId: "p", status: "PRESENT" }],
+      expect(mockRegisterQueue.enqueueRegister).toHaveBeenCalledWith(
+        {
+          key: expect.stringMatching(/^[a-f0-9-]{36}$/),
+          subdomain: "school",
+          batch: {
+            date: expect.any(String),
+            records: [{ studentId: "p", status: "PRESENT" }],
+          },
         },
-      }),
+        expect.any(Number),
+        expect.any(Function),
+      ),
     );
     expect(await screen.findByText(/saved on this device/)).toBeVisible();
     expect(screen.queryByText(/unsaved marks/)).toBeNull();
     expect(await screen.findByText(/1 register waiting to sync/)).toBeVisible();
   });
   test("a server rejection is never queued", async () => {
-    mockMutate.mockRejectedValue(new ApiError(403, "School closed", {}));
+    jest
+      .spyOn(teacherApi, "saveRegister")
+      .mockRejectedValue(new ApiError(403, "School closed", {}));
     await markAndSave();
-    expect(registerQueue.enqueueRegister).not.toHaveBeenCalled();
+    expect(mockRegisterQueue.enqueueRegister).not.toHaveBeenCalled();
     expect(screen.getByText(/1 unsaved marks/)).toBeVisible();
   });
   test("a full queue keeps the marks on screen", async () => {
-    mockMutate.mockRejectedValue(new ApiError(503, "Unavailable", {}));
-    jest.mocked(registerQueue.enqueueRegister).mockResolvedValue(false);
+    jest
+      .spyOn(teacherApi, "saveRegister")
+      .mockRejectedValue(new ApiError(503, "Unavailable", {}));
+    jest.mocked(mockRegisterQueue.enqueueRegister).mockResolvedValue(false);
     await markAndSave();
     await waitFor(() =>
-      expect(registerQueue.enqueueRegister).toHaveBeenCalled(),
+      expect(mockRegisterQueue.enqueueRegister).toHaveBeenCalled(),
     );
     expect(screen.getByText(/1 unsaved marks/)).toBeVisible();
   });
+  test("a later save waits behind a queued register whose outcome is still unknown", async () => {
+    const saveRegister = jest.spyOn(teacherApi, "saveRegister");
+    jest
+      .mocked(mockRegisterQueue.flushRegisterQueue)
+      .mockResolvedValueOnce({ synced: 0, rejected: [], remaining: 1 });
+    await markAndSave();
+    await waitFor(() =>
+      expect(mockRegisterQueue.enqueueRegister).toHaveBeenCalled(),
+    );
+    expect(saveRegister).not.toHaveBeenCalled();
+  });
+});
+
+test("submits an assessment with its selected excused pupil after confirmation", async () => {
+  const assessment = teacherApi.assessmentSheetSchema.parse(fixture.assessment);
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+  try {
+    mockQuery.mockImplementation((parts: string[]) => ({
+      ...baseQuery,
+      data:
+        parts[0] === "assessment"
+          ? {
+              ...assessment,
+              canSubmit: true,
+              students: assessment.students.map((student) => ({
+                ...student,
+                marks: [],
+                complete: false,
+              })),
+            }
+          : fixture[parts[0]!],
+    }));
+    await render(<TeacherScoreEntry />);
+    expect(screen.getByRole("button", { name: "Submit marks" })).toBeDisabled();
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Mark absent / excused" }),
+    );
+    await fireEvent.press(screen.getByRole("button", { name: "Submit marks" }));
+    const confirm = alert.mock.calls[0]?.[2]?.find(
+      (button) => button.text === "Submit marks",
+    );
+    expect(confirm?.onPress).toBeDefined();
+    await act(async () => {
+      confirm?.onPress?.();
+    });
+    expect(mockMutate).toHaveBeenCalledWith({
+      request: {
+        classId: "c",
+        subjectId: "math",
+        templateId: assessment.template?.id,
+        excusedStudentIds: [assessment.students[0]?.studentId],
+      },
+    });
+  } finally {
+    alert.mockRestore();
+  }
+});
+
+test("marking a pupil absent clears saved marks only after confirmation", async () => {
+  const sheet = teacherApi.assessmentSheetSchema.parse(fixture.assessment);
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+  try {
+    mockQuery.mockImplementation((parts: string[]) => ({
+      ...baseQuery,
+      data:
+        parts[0] === "assessment"
+          ? {
+              ...sheet,
+              canSubmit: true,
+              students: sheet.students.map((student) => ({
+                ...student,
+                marks: [{ componentId: "test", occurrenceIndex: 0, marks: 7 }],
+              })),
+            }
+          : fixture[parts[0]!],
+    }));
+    await render(<TeacherScoreEntry />);
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Mark absent / excused" }),
+    );
+    expect(mockMutate).not.toHaveBeenCalled();
+    const confirmation = alert.mock.calls[0]?.[2]?.find(
+      (action) => action.text === "Clear marks",
+    );
+    expect(confirmation?.onPress).toBeDefined();
+    await act(async () => confirmation?.onPress?.());
+    expect(mockMutate).toHaveBeenCalledWith({
+      request: {
+        classId: "c",
+        subjectId: "math",
+        templateId: "template",
+        termId: "term",
+        entries: [
+          {
+            studentId: "p",
+            componentId: "test",
+            occurrenceIndex: 0,
+            expectedMarks: 7,
+            marks: null,
+          },
+        ],
+      },
+    });
+    expect(
+      screen.getByRole("button", { name: "Undo absent / excused" }),
+    ).toBeVisible();
+  } finally {
+    alert.mockRestore();
+  }
 });

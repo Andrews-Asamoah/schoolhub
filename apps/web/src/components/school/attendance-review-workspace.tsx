@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CalendarOff, CheckCheck, ClipboardList, ShieldCheck, Trash2 } from "lucide-react";
@@ -159,23 +160,23 @@ export function AttendanceReviewWorkspace({ classId, canManage }: {
       </p> : <div className="space-y-2">
         <h4 className="text-xs font-bold">Unmarked register days</h4>
         <div className="max-h-64 overflow-y-auto rounded-xl border border-border">
-          <table className="w-full text-left text-xs">
-            <thead className="sticky top-0 bg-muted">
-              <tr><th className="p-2">Date</th><th className="p-2">Recorded / expected</th><th className="p-2">Missing</th><th className="p-2">Action</th></tr>
-            </thead>
-            <tbody>{gaps.days.map(day => <tr key={day.date} className="border-t border-border">
-              <td className="p-2">{day.date}{day.historical && <span className="ml-1 text-muted-foreground">(historical)</span>}</td>
-              <td className="p-2">{day.marked} / {day.expected}</td>
-              <td className="p-2 font-semibold">{day.missing}</td>
-              <td className="p-2">
+          <Table dense scroll={false} className="w-full text-left text-xs">
+            <TableHeader className="sticky top-0 bg-muted">
+              <TableRow><TableHead>Date</TableHead><TableHead>Recorded / expected</TableHead><TableHead>Missing</TableHead><TableHead>Action</TableHead></TableRow>
+            </TableHeader>
+            <TableBody>{gaps.days.map(day => <TableRow key={day.date} className="border-t border-border">
+              <TableCell>{day.date}{day.historical && <span className="ml-1 text-muted-foreground">(historical)</span>}</TableCell>
+              <TableCell>{day.marked} / {day.expected}</TableCell>
+              <TableCell className="font-semibold">{day.missing}</TableCell>
+              <TableCell>
                 {canManage
                   ? <button type="button" className="text-primary underline" onClick={() => {
                     setDateSelection(day.date); setStudentId("");
                   }}>Review pupils</button>
                   : <span className="text-muted-foreground">Class teacher to complete</span>}
-              </td>
-            </tr>)}</tbody>
-          </table>
+              </TableCell>
+            </TableRow>)}</TableBody>
+          </Table>
         </div>
       </div>}
     </>}

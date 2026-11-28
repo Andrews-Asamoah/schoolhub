@@ -1,0 +1,42 @@
+Mobile portal handoffs, based on dev c2904d69
+
+pnpm install --frozen-lockfile
+Lockfile is up to date.
+
+pnpm --filter @schoolhub/mobile typecheck
+pnpm --filter @schoolhub/mobile lint
+pnpm --filter @schoolhub/mobile format:check
+All passed.
+
+pnpm --filter @schoolhub/mobile test
+30 suites and 254 tests passed.
+
+pnpm --filter @schoolhub/mobile test:release
+46 checks passed.
+
+pnpm --filter @schoolhub/mobile verify:endpoints
+79 endpoint declarations matched the route inventory.
+
+pnpm --filter @schoolhub/mobile audit:contrast
+1,582 contrast pairs passed.
+
+expo-doctor@1.21.5
+20/20 checks passed.
+
+Expo config introspection with a test portal origin
+The Android manifest included the auto-verified /reset-password HTTPS intent filter.
+The iOS associated domain entitlement included the configured portal host.
+
+expo export --platform android/ios --source-maps and verify-release.mjs
+Both export checks passed with 66 app sources per platform.
+
+pnpm --filter @schoolhub/web build
+Production build passed.
+
+Chromium portal-workflows, portal-boundaries and password-recovery suites
+Passed, including fresh and existing browser sessions, an invalid continuation,
+desktop/mobile guardian statements and browser password recovery.
+
+CI=1 npx eas-cli whoami
+Not logged in. Signed builds, live domain association, device testing and
+device screenshots remain pending.

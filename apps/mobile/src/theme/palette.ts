@@ -226,15 +226,15 @@ export function brandPalette(
   secondary?: string | null,
   scheme: PaletteScheme = "light",
 ) {
-  const solid = ensureContrast(safeHex(primary, "#5046E5"), "#FFFFFF");
+  const solid = ensureContrast(safeHex(primary, "#073480"), "#FFFFFF");
   const end = ensureContrast(
-    blend(solid, safeHex(secondary, "#A237E8"), 0.6),
+    blend(solid, safeHex(secondary, "#164C9E"), 0.6),
     "#FFFFFF",
   );
   return {
     solid,
     gradient: [solid, end] as const,
-    focus: ensureContrast(safeHex(primary, "#5046E5"), neutrals[scheme].card),
+    focus: ensureContrast(safeHex(primary, "#073480"), neutrals[scheme].card),
     onSolid: "#FFFFFF",
   };
 }

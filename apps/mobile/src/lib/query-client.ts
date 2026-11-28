@@ -49,10 +49,11 @@ export const persistOptions: PersistQueryClientProviderProps["persistOptions"] =
   };
 
 /** Sign-out: drop everything in memory and on disk. */
-export async function wipeQueryCache() {
+export async function wipeQueryCache(preserveRegister = false) {
   await queryClient.cancelQueries();
   queryClient.clear();
-  await AsyncStorage.removeItem(STORAGE_KEY);
-  // Queued offline registers belong to the signed-in teacher and school.
-  await clearRegisterQueue();
+  await Promise.all([
+    AsyncStorage.removeItem(STORAGE_KEY),
+    preserveRegister ? undefined : clearRegisterQueue(),
+  ]);
 }

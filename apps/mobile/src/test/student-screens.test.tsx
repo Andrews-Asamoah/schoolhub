@@ -6,6 +6,7 @@ import {
 } from "@testing-library/react-native";
 import type { ReactNode } from "react";
 import StudentAssignmentScreen from "../../app/(student)/assignment/[id]";
+import StudentLearningScreen from "../../app/(student)/my-learning";
 import StudentAttendanceScreen from "../../app/(student)/my-attendance";
 
 const mockUseMyAssignmentsQuery = jest.fn();
@@ -15,6 +16,7 @@ const mockMutate = jest.fn();
 jest.mock("@/features/student/queries", () => ({
   useMyAssignmentsQuery: () => mockUseMyAssignmentsQuery(),
   useMyAttendanceQuery: () => mockUseMyAttendanceQuery(),
+  useMySubjectsQuery: () => ({ data: { class: null, subjects: [] } }),
 }));
 jest.mock("@/features/student/mutations", () => ({
   useSubmitAssignmentMutation: () => ({
@@ -86,12 +88,21 @@ jest.mock("@/components/ListRow", () => {
   const { Text, View } =
     jest.requireActual<typeof import("react-native")>("react-native");
   return {
-    ListRow: ({ title, subtitle }: { title: string; subtitle?: string }) =>
+    ListRow: ({
+      title,
+      subtitle,
+      status,
+    }: {
+      title: string;
+      subtitle?: string;
+      status?: string;
+    }) =>
       React.createElement(
         View,
         null,
         React.createElement(Text, null, title),
         subtitle ? React.createElement(Text, null, subtitle) : null,
+        status ? React.createElement(Text, null, status) : null,
       ),
   };
 });
@@ -264,4 +275,21 @@ test("student assignment submission requires a non-empty response", async () => 
   );
   fireEvent.press(screen.getByRole("button", { name: "Submit assignment" }));
   expect(mockMutate).toHaveBeenCalledWith({ responseText: "  My answer  " });
+});
+
+test("the learning list labels overdue work while keeping submitted work separate", async () => {
+  const overdue = { ...assignment, dueAt: "2020-01-02T00:00:00Z" };
+  const submitted = {
+    ...overdue,
+    id: "assignment-2",
+    title: "Geometry",
+    submission: { status: "SUBMITTED" },
+  };
+  mockUseMyAssignmentsQuery.mockReturnValue({
+    ...baseQuery,
+    data: { assignments: [overdue, submitted] },
+  });
+  await render(<StudentLearningScreen />);
+  expect(screen.getByText("Overdue")).toBeVisible();
+  expect(screen.getByText("Submitted")).toBeVisible();
 });

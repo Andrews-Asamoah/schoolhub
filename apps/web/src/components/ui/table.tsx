@@ -5,12 +5,20 @@ import { cn } from "@/lib/utils";
  * shadcn/ui table primitives. Colours come from the semantic theme tokens in
  * index.css (border, muted, card …) so every table follows light and dark mode.
  */
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-x-auto">
-      <table ref={ref} className={cn("w-full caption-bottom border-collapse text-sm", className)} {...props} />
-    </div>
-  ),
+type TableProps = React.TableHTMLAttributes<HTMLTableElement> & {
+  /** Disable the wrapper when the caller already provides a scroll or print container. */
+  scroll?: boolean;
+  /** Tighter rows for previews and dialogs. Density lives here so cells never set their own padding. */
+  dense?: boolean;
+};
+
+const DENSE = "[&_th]:h-9 [&_th]:px-3 [&_td]:px-3 [&_td]:py-2";
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, scroll = true, dense = false, ...props }, ref) => {
+    const table = <table ref={ref} className={cn("w-full caption-bottom border-collapse text-sm", dense && DENSE, className)} {...props} />;
+    return scroll ? <div className="relative w-full overflow-x-auto">{table}</div> : table;
+  },
 );
 Table.displayName = "Table";
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
-  LayoutDashboard, School, Shield, ShieldCheck, Users, CreditCard,
+  LayoutDashboard, School, ShieldCheck, Users, CreditCard,
   UserCircle, LifeBuoy, ScrollText, Layers3, UserX, type LucideIcon,
 } from "lucide-react";
 import { SidebarUserMenu } from "@/components/ui/sidebar-user-menu";
@@ -46,13 +46,13 @@ export function SuperAdminSidebar({ activePage, userName, userEmail }: SuperAdmi
   return (
     <Sidebar className="superadmin-sidebar-shell border-r border-sidebar-border">
       <SidebarHeader className="superadmin-sidebar-panel">
-        <Link to="/admin/dashboard" aria-label="SchoolHub platform dashboard"
+        <Link to="/admin/dashboard" aria-label="schoolHub platform dashboard"
           className="flex min-w-0 w-full items-center gap-2.5 rounded-lg px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-            <Shield className="size-5" strokeWidth={2} />
+            <img src="/schoolhub.webp" alt="" className="size-full rounded-lg object-contain" />
           </span>
           <span className="sidebar-expanded min-w-0 flex-1">
-            <span className="superadmin-brand-title block truncate text-[14px] font-bold tracking-tight">SchoolHub</span>
+            <span className="superadmin-brand-title block truncate text-[14px] font-bold tracking-tight">schoolHub</span>
             <span className="block text-[10px] font-bold tracking-[0.12em] text-muted-foreground">PLATFORM ADMIN</span>
           </span>
         </Link>

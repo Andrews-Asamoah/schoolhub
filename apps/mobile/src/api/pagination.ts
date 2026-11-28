@@ -13,6 +13,7 @@ type InfiniteEndpointOptions<TItem, TMeta> = {
     signal?: AbortSignal;
   }) => Promise<PageEnvelope<TItem, TMeta>>;
   query?: EndpointQuery;
+  enabled?: boolean;
   getNextPage: (lastPage: PageEnvelope<TItem, TMeta>) => number | undefined;
 };
 
@@ -21,10 +22,13 @@ export function useInfiniteEndpointQuery<TItem, TMeta>({
   queryKey,
   endpoint,
   query,
+  enabled,
   getNextPage,
 }: InfiniteEndpointOptions<TItem, TMeta>) {
   return useInfiniteQuery({
     queryKey,
+    enabled,
+    meta: { persist: false },
     initialPageParam: 1,
     queryFn: ({ pageParam, signal }) =>
       endpoint({

@@ -59,9 +59,10 @@ export class FinanceApprovalSettingsService {
         create: { schoolId, control, required: input.required, approverRoles: roles, updatedById: actor.id },
         update: { required: input.required, approverRoles: roles, updatedById: actor.id },
       });
+      const { required: previouslyRequired, approverRoles: previousRoles, configured } = effectiveSetting(control, before);
       await writeAudit(tx, actor, {
         action: "UPDATE", entityType: "finance.approval-setting.update", entityId: control, schoolId,
-        oldValues: before ? { required: before.required, approverRoles: before.approverRoles } : { required: false, approverRoles: [], configured: false },
+        oldValues: { required: previouslyRequired, approverRoles: previousRoles, configured },
         newValues: { required: input.required, approverRoles: roles },
       });
     });

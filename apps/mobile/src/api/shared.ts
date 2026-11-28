@@ -71,6 +71,27 @@ export const markAllNotificationsRead = defineEndpoint({
   }),
 });
 
+const pushRegistrationId = z.string().regex(/^[a-f0-9]{64}$/);
+export const registerPushDevice = defineEndpoint({
+  method: "POST",
+  path: "/notifications/devices",
+  roles: ["teacher", "student", "guardian"],
+  request: z.object({
+    token: z
+      .string()
+      .max(200)
+      .regex(/^(?:Expo|Exponent)PushToken\[[\w-]+\]$/),
+  }),
+  response: z.object({ registrationId: pushRegistrationId }),
+});
+export const removePushDevice = defineEndpoint({
+  method: "DELETE",
+  path: "/notifications/devices",
+  roles: ["teacher", "student", "guardian"],
+  request: z.object({ registrationId: pushRegistrationId }),
+  response: actionResponseSchema,
+});
+
 const preferencesSchema = z.object({
   emailEnabled: z.boolean(),
   smsEnabled: z.boolean(),
@@ -148,6 +169,22 @@ export const listSentMessages = defineEndpoint({
   path: "/messages/sent",
   roles: ["teacher", "student", "guardian"],
   response: z.array(schoolMessageSchema),
+});
+const messagePageSchema = z.object({
+  items: z.array(schoolMessageSchema),
+  nextCursor: z.string().nullable(),
+});
+export const listInboxPage = defineEndpoint({
+  method: "GET",
+  path: "/messages/inbox/page",
+  roles: ["teacher", "student", "guardian"],
+  response: messagePageSchema,
+});
+export const listSentPage = defineEndpoint({
+  method: "GET",
+  path: "/messages/sent/page",
+  roles: ["teacher", "student", "guardian"],
+  response: messagePageSchema,
 });
 export const messageRecipientSchema = z.object({
   id: z.string(),

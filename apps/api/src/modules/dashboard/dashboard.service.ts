@@ -1,7 +1,9 @@
+import { formatPersonName } from "@schoolhub/shared";
 import { Prisma } from "@prisma/client";
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
-import { FINANCE_READ_ROLES, FINANCE_SUMMARY_ROLES } from "../finance/finance.permissions.js";
+import { dateString, eligibleInstructionalDates, isoDay, type AttendanceMark } from "../attendance/attendance-calendar.js";
+import { FINANCE_READ_ROLES, FINANCE_SUMMARY_ROLES, isFinancePayrollExportRole } from "../finance/finance.permissions.js";
 
 const FINANCE_SUMMARY_ROLE_SET = new Set<string>(FINANCE_SUMMARY_ROLES);
 const sumMoney = <T>(rows: T[], value: (row: T) => Prisma.Decimal | string | number) =>
@@ -12,6 +14,68 @@ const FINANCE_DETAIL_ROLE_SET = new Set<string>(FINANCE_READ_ROLES);
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getTodayAttendance(schoolId: string) {
+    const date = dateString(new Date());
+    const day = new Date(isoDay(date));
+    const term = await this.prisma.client.term.findFirst({
+      where: { isCurrent: true, academicYear: { schoolId, isCurrent: true } },
+      select: {
+        id: true,
+        academicYearId: true,
+        startDate: true,
+        endDate: true,
+        instructionalWeekdays: true,
+        calendarDays: { where: { schoolId, date: day }, select: { isInstructional: true } },
+      },
+    });
+    if (!term || day < term.startDate || day > term.endDate) {
+      return { date, state: "outside-term" as const };
+    }
+    const instructionalDates = eligibleInstructionalDates({
+      start: date,
+      end: date,
+      asOf: date,
+      weekdays: term.instructionalWeekdays,
+      overrides: term.calendarDays.map(({ isInstructional }) => ({ date, isInstructional })),
+    });
+    if (!instructionalDates.length) {
+      return { date, state: "non-instructional" as const };
+    }
+
+    const enrollments = await this.prisma.client.enrollment.findMany({
+      where: {
+        academicYearId: term.academicYearId,
+        termId: term.id,
+        status: "ACTIVE",
+        AND: [
+          { OR: [{ effectiveFrom: null }, { effectiveFrom: { lte: day } }] },
+          { OR: [{ effectiveTo: null }, { effectiveTo: { gte: day } }] },
+        ],
+        class: { schoolId, deletedAt: null },
+        student: {
+          schoolId,
+          status: "ACTIVE",
+          deletedAt: null,
+          admissionDate: { lte: day },
+          attendanceExclusions: { none: { schoolId, termId: term.id, date: day } },
+        },
+      },
+      select: { student: { select: { attendances: { where: { date: day }, select: { status: true } } } } },
+    });
+    const counts: Record<AttendanceMark, number> = {
+      PRESENT: 0, LATE: 0, ABSENT: 0, EXCUSED: 0, SICK: 0, PERMISSION: 0,
+    };
+    let marked = 0;
+    for (const { student } of enrollments) {
+      const mark = student.attendances[0];
+      if (mark) {
+        counts[mark.status]++;
+        marked++;
+      }
+    }
+    return { date, state: "instructional" as const, counts, marked, expected: enrollments.length };
+  }
+
   async getAnalytics(schoolId: string, role: string | undefined, requestedMonths?: number) {
     const months = [3, 6, 12].includes(Number(requestedMonths)) ? Number(requestedMonths) : 6;
     const now = new Date();
@@ -19,6 +83,8 @@ export class DashboardService {
     const firstMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months + 1, 1));
     const canViewFinance = FINANCE_SUMMARY_ROLE_SET.has(role ?? "");
     const canViewFinanceDetails = FINANCE_DETAIL_ROLE_SET.has(role ?? "");
+    // Salary spending is confidential: only the roles that may export payroll see it in dashboard totals.
+    const salaryFilter = isFinancePayrollExportRole(role) ? {} : { OR: [{ category: null }, { category: { not: "SALARY" as const } }] };
     const monthEnds = Array.from({ length: months }, (_, index) =>
       new Date(Date.UTC(firstMonth.getUTCFullYear(), firstMonth.getUTCMonth() + index + 1, 0, 23, 59, 59, 999)),
     );
@@ -29,7 +95,7 @@ export class DashboardService {
     const [students, teachers, monthlyPayments, monthlyExpenses, recentStudents, recentPayments, recentExpenses] = await Promise.all([
       this.prisma.client.student.findMany({
         where: { schoolId, deletedAt: null, status: "ACTIVE", admissionDate: { lte: now } },
-        select: { admissionDate: true, createdAt: true, profile: { select: { firstName: true, lastName: true, gender: true } } },
+        select: { admissionDate: true, createdAt: true, profile: { select: { firstName: true, otherNames: true, lastName: true, gender: true } } },
       }),
       this.prisma.client.teacher.count({ where: { schoolId, isActive: true, deletedAt: null } }),
       canViewFinance ? this.prisma.client.payment.findMany({
@@ -37,21 +103,21 @@ export class DashboardService {
         select: { amount: true, paymentDate: true },
       }) : Promise.resolve([]),
       canViewFinance ? this.prisma.client.expense.findMany({
-        where: { schoolId, date: { gte: firstMonth, lte: now } },
+        where: { schoolId, date: { gte: firstMonth, lte: now }, ...salaryFilter },
         select: { amount: true, date: true },
       }) : Promise.resolve([]),
       role !== "teacher" ? this.prisma.client.student.findMany({
         where: { schoolId, deletedAt: null, createdAt: { gte: firstMonth, lte: now } },
         orderBy: { createdAt: "desc" }, take: 8,
-        select: { id: true, createdAt: true, admissionDate: true, profile: { select: { firstName: true, lastName: true } } },
+        select: { id: true, createdAt: true, admissionDate: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } },
       }) : Promise.resolve([]),
       canViewFinanceDetails ? this.prisma.client.payment.findMany({
         where: { schoolId, createdAt: { gte: firstMonth, lte: now }, status: "COMPLETED" },
         orderBy: { createdAt: "desc" }, take: 8,
-        select: { id: true, amount: true, createdAt: true, paymentNumber: true, student: { select: { profile: { select: { firstName: true, lastName: true } } } } },
+        select: { id: true, amount: true, createdAt: true, paymentNumber: true, student: { select: { profile: { select: { firstName: true, otherNames: true, lastName: true } } } } },
       }) : Promise.resolve([]),
       canViewFinanceDetails ? this.prisma.client.expense.findMany({
-        where: { schoolId, createdAt: { gte: firstMonth, lte: now } },
+        where: { schoolId, createdAt: { gte: firstMonth, lte: now }, ...salaryFilter },
         orderBy: { createdAt: "desc" }, take: 8,
         select: { id: true, amount: true, createdAt: true, description: true, payee: true },
       }) : Promise.resolve([]),
@@ -91,12 +157,12 @@ export class DashboardService {
     const activities = [
       ...recentStudents.map((student) => ({
         id: "student-" + student.id, type: "student" as const, title: "Student record added",
-        detail: [student.profile.firstName, student.profile.lastName].filter(Boolean).join(" ") || "Student record",
+        detail: formatPersonName(student.profile) || "Student record",
         amount: null, createdAt: student.createdAt.toISOString(),
       })),
       ...(canViewFinanceDetails ? recentPayments.map((payment) => ({
         id: "payment-" + payment.id, type: "payment" as const, title: "Fee payment recorded",
-        detail: [payment.paymentNumber, [payment.student.profile.firstName, payment.student.profile.lastName].filter(Boolean).join(" ")].filter(Boolean).join(" · "),
+        detail: [payment.paymentNumber, formatPersonName(payment.student.profile)].filter(Boolean).join(" · "),
         amount: Number(payment.amount), createdAt: payment.createdAt.toISOString(),
       })) : []),
       ...(canViewFinanceDetails ? recentExpenses.map((expense) => ({

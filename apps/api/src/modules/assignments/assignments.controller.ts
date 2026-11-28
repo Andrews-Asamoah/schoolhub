@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import type { PublishAssignmentBatchInput } from "@schoolhub/shared";
 import type { School } from "@prisma/client";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
 import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
@@ -9,6 +10,7 @@ import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import {
   createSchoolAssignmentSchema,
+  publishAssignmentBatchSchema,
   gradeSchoolAssignmentSchema,
   submitSchoolAssignmentSchema,
   type CreateSchoolAssignmentInput,
@@ -47,6 +49,17 @@ export class AssignmentsController {
     @Body(new ZodValidationPipe(createSchoolAssignmentSchema)) body: CreateSchoolAssignmentInput,
   ) {
     return this.assignments.create(school.id, user.id, role, body);
+  }
+
+  @Post("batch")
+  @Roles("teacher")
+  publishBatch(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() role: string | undefined,
+    @Body(new ZodValidationPipe(publishAssignmentBatchSchema)) body: PublishAssignmentBatchInput,
+  ) {
+    return this.assignments.publishBatch(school.id, user.id, role, body);
   }
 
   @Post(":id/submission")

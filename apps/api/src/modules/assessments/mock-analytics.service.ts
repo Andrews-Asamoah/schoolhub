@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
@@ -11,20 +12,40 @@ const MANAGEMENT = new Set(["owner", "admin", "headteacher"]);
 export class MockAnalyticsService {
   constructor(private readonly prisma: PrismaService, private readonly scope: TeacherScopeService) {}
 
-  /** Years and classes that have at least one mock, for the page filters. */
+  /**
+   * Years and classes that have at least one mock, for the page filters. A mock with no classes
+   * picked applies to every class of its year, so those classes are offered too; otherwise a mock
+   * made for "all classes" would leave the class list empty and the page blank.
+   */
   async options(schoolId: string) {
     const db = this.prisma.client;
     const mocks = await db.assessmentTemplate.findMany({
       where: { schoolId, category: "MOCK" },
       select: { academicYearId: true, classes: { select: { classId: true } } },
     });
-    const yearIds = [...new Set(mocks.map((m) => m.academicYearId).filter((id): id is string => !!id))];
-    const classIds = [...new Set(mocks.flatMap((m) => m.classes.map((c) => c.classId)))];
+    const withYear = mocks.filter((m): m is typeof m & { academicYearId: string } => !!m.academicYearId);
+    const yearIds = [...new Set(withYear.map((m) => m.academicYearId))];
+    const openYearIds = [...new Set(withYear.filter((m) => m.classes.length === 0).map((m) => m.academicYearId))];
+    const explicitClassIds = [...new Set(withYear.flatMap((m) => m.classes.map((c) => c.classId)))];
     const [years, classes] = await Promise.all([
       db.academicYear.findMany({ where: { schoolId, id: { in: yearIds } }, orderBy: { startDate: "desc" }, select: { id: true, name: true, isCurrent: true } }),
-      db.class.findMany({ where: { schoolId, id: { in: classIds }, deletedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, academicYearId: true } }),
+      db.class.findMany({
+        where: {
+          schoolId, deletedAt: null,
+          OR: [{ id: { in: explicitClassIds } }, ...(openYearIds.length ? [{ academicYearId: { in: openYearIds } }] : [])],
+        },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, academicYearId: true },
+      }),
     ]);
-    return { years, classes };
+    return {
+      years,
+      // yearIds = the years in which this class has a mock, so the page can filter on what is really there.
+      classes: classes.map((klass) => ({
+        ...klass,
+        yearIds: yearIds.filter((yearId) => withYear.some((m) => m.academicYearId === yearId && (m.classes.length ? m.classes.some((c) => c.classId === klass.id) : klass.academicYearId == null || klass.academicYearId === yearId))),
+      })).filter((klass) => klass.yearIds.length > 0),
+    };
   }
 
   async analyse(schoolId: string, userId: string, role: string | undefined, input: { academicYearId: string; classId: string; includeDrafts: boolean }) {
@@ -55,12 +76,12 @@ export class MockAnalyticsService {
     });
     const enrolments = await db.enrollment.findMany({
       where: { classId: klass.id, academicYearId: year.id, status: { in: ["ACTIVE", "COMPLETED"] }, student: { schoolId, deletedAt: null } },
-      select: { student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } } },
+      select: { student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } } },
     });
     const students = [...new Map(enrolments.map((e) => [e.student.id, {
       id: e.student.id,
       admissionNumber: e.student.admissionNumber ?? "",
-      name: `${e.student.profile.firstName} ${e.student.profile.lastName}`.trim(),
+      name: formatPersonName(e.student.profile),
     }])).values()].sort((a, b) => a.name.localeCompare(b.name));
 
     const rows = templates.length && students.length

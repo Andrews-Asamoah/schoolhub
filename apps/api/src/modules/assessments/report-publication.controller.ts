@@ -1,23 +1,38 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Res, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Query, Res, UseGuards } from "@nestjs/common";
 import type { School } from "@prisma/client";
-import { createReportSetSchema, type CreateReportSetInput } from "@schoolhub/shared";
+import { createReportSetSchema, reopenReportSetSchema, type CreateReportSetInput, type ReopenReportSetInput } from "@schoolhub/shared";
+import { z } from "zod";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
+import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { ReportPublicationService } from "./report-publication.service.js";
 import { ReportVersionService } from "./report-version.service.js";
+import { ARCHIVE_DEFAULT_PAGE_SIZE, ARCHIVE_MAX_PAGE_SIZE, ReportArchiveService } from "./report-archive.service.js";
 import type { Response } from "express";
 import { ReportTemplatePresetsService } from "./report-template-presets.service.js";
+import { Throttle } from "@nestjs/throttler";
+import { BULK_THROTTLE } from "../../common/bulk-throttle.js";
+
+const archiveQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(ARCHIVE_MAX_PAGE_SIZE).default(ARCHIVE_DEFAULT_PAGE_SIZE),
+  academicYearId: z.string().trim().min(1).max(64).optional(),
+  termId: z.string().trim().min(1).max(64).optional(),
+  classId: z.string().trim().min(1).max(64).optional(),
+  q: z.string().trim().max(100).optional(),
+});
 
 @Controller("assessments/report-cards")
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class ReportPublicationController {
   constructor(private readonly reports: ReportPublicationService,
     private readonly templatePresets: ReportTemplatePresetsService,
-    private readonly versions: ReportVersionService) {}
+    private readonly versions: ReportVersionService,
+    private readonly archive: ReportArchiveService) {}
 
   private recommendation(body: unknown): string {
     const remark = (body && typeof body === "object" && "remark" in body)
@@ -34,11 +49,58 @@ export class ReportPublicationController {
     return this.versions.teacherQueue(school.id, user.id);
   }
 
+  /** Autosave: the text may be unfinished, and an empty text clears the draft. */
+  @Put("versions/:id/draft")
+  @Roles("teacher")
+  saveDraft(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string, @Body() body: unknown) {
+    const remark = body && typeof body === "object" && "remark" in body ? (body as { remark: unknown }).remark : undefined;
+    if (typeof remark !== "string") throw new BadRequestException("Send the recommendation text.");
+    return this.versions.saveDraft(school.id, user.id, id, remark);
+  }
+
+  @Post("versions/bulk-recommend")
+  @Throttle(BULK_THROTTLE)
+  @Roles("teacher")
+  bulkRecommend(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
+    const raw = body && typeof body === "object" && "items" in body ? (body as { items: unknown }).items : undefined;
+    if (!Array.isArray(raw)) throw new BadRequestException("Send the pupils to sign off as a list called items.");
+    const items = raw.map((row) => {
+      const id = row && typeof row === "object" ? (row as { id?: unknown }).id : undefined;
+      const remark = row && typeof row === "object" ? (row as { remark?: unknown }).remark : undefined;
+      if (typeof id !== "string" || !id || typeof remark !== "string") throw new BadRequestException("Each item needs an id and a remark.");
+      return { id, remark };
+    });
+    return this.versions.bulkRecommend(school.id, user.id, items);
+  }
+
   @Post("versions/:id/recommend")
   @Roles("teacher")
   recommend(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser,
     @Param("id") id: string, @Body() body: unknown) {
     return this.versions.recommend(school.id, user.id, id, this.recommendation(body));
+  }
+
+  /** Every pupil in an unpublished batch that the headteacher can act on, across all batches. */
+  @Get("head-queue")
+  @Roles("headteacher")
+  getHeadteacherQueue(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser) {
+    return this.versions.headQueue(school.id, user.id);
+  }
+
+  @Post("versions/bulk-head-approve")
+  @Throttle(BULK_THROTTLE)
+  @Roles("headteacher")
+  bulkHeadteacherApprove(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
+    const raw = body && typeof body === "object" && "items" in body ? (body as { items: unknown }).items : undefined;
+    if (!Array.isArray(raw)) throw new BadRequestException("Send the pupils to approve as a list called items.");
+    const items = raw.map((row) => {
+      const id = row && typeof row === "object" ? (row as { id?: unknown }).id : undefined;
+      const remark = row && typeof row === "object" ? (row as { remark?: unknown }).remark : undefined;
+      if (typeof id !== "string" || !id || typeof remark !== "string") throw new BadRequestException("Each item needs an id and a remark.");
+      return { id, remark };
+    });
+    return this.versions.bulkHeadApprove(school.id, user.id, items);
   }
 
   @Patch("versions/:id/head-approve")
@@ -48,6 +110,25 @@ export class ReportPublicationController {
     return this.versions.headteacherApprove(school.id, user.id, id, this.recommendation(body));
   }
 
+  /** One pupil's generated report, for school management and the pupil's class teacher. */
+  @Get("versions/:id/preview")
+  @Roles("owner", "admin", "headteacher", "teacher")
+  previewVersion(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.versions.previewVersion(school.id, user, id);
+  }
+
+  @Get("versions/:id/pdf")
+  @Roles("owner", "admin", "headteacher", "teacher")
+  async previewVersionPdf(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string, @Res() res: Response) {
+    const file = await this.versions.previewPdf(school.id, user, id);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Content-Disposition", 'attachment; filename="' + file.filename + '"');
+    res.setHeader("Content-Length", file.pdf.length);
+    res.end(file.pdf);
+  }
+
   @Get("me/:reportId/pdf")
   @Roles("student")
   async studentReportPdf(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser,
@@ -55,6 +136,31 @@ export class ReportPublicationController {
     const file = await this.versions.publishedPdf(school.id, user.id, reportId, "student");
     res.setHeader("Content-Type","application/pdf");
     res.setHeader("Cache-Control","private, no-store");
+    res.setHeader("Content-Disposition", 'attachment; filename="' + file.filename + '"');
+    res.setHeader("Content-Length", file.pdf.length);
+    res.end(file.pdf);
+  }
+
+  /** Filter choices for the archive page: years and terms with published reports, and classes. */
+  @Get("archive/filters")
+  @Roles("owner", "admin", "headteacher", "teacher")
+  archiveFilters(@CurrentSchool() school: School) { return this.archive.filters(school.id); }
+
+  /** Published report cards, paginated on the server. A teacher only sees pupils in classes they teach. */
+  @Get("archive")
+  @Roles("owner", "admin", "headteacher", "teacher")
+  archiveList(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @CurrentSchoolRole() role: string,
+    @Query(new ZodValidationPipe(archiveQuerySchema)) query: z.infer<typeof archiveQuerySchema>) {
+    return this.archive.list(school.id, user.id, role, query);
+  }
+
+  @Get("archive/:reportId/pdf")
+  @Roles("owner", "admin", "headteacher", "teacher")
+  async archivePdf(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @CurrentSchoolRole() role: string,
+    @Param("reportId") reportId: string, @Res() res: Response) {
+    const file = await this.archive.pdf(school.id, user, role, reportId);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("Content-Disposition", 'attachment; filename="' + file.filename + '"');
     res.setHeader("Content-Length", file.pdf.length);
     res.end(file.pdf);
@@ -117,6 +223,13 @@ export class ReportPublicationController {
   @Roles("owner", "admin", "headteacher")
   generate(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.reports.generate(school.id, user.id, id);
+  }
+
+  /** Owner or administrator only: a published batch has wrong marks and must be regenerated. */
+  @Post("sets/:id/reopen")
+  @Roles("owner", "admin")
+  reopen(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body(new ZodValidationPipe(reopenReportSetSchema)) body: ReopenReportSetInput) {
+    return this.reports.reopen(school.id, user.id, id, body.reason);
   }
 
   @Patch("sets/:id/review")

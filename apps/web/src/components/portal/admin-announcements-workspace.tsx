@@ -1,6 +1,7 @@
+import { toast } from "@/components/ui/toaster";
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, LoaderCircle, Pin, Plus, RefreshCw, Send, Trash2, X } from "lucide-react";
+import { LoaderCircle, Pin, Plus, RefreshCw, Send, Trash2, X } from "lucide-react";
 import type { AnnouncementCategory, AnnouncementStatus, CreateAnnouncementInput } from "@schoolhub/shared";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -20,7 +21,6 @@ import {
 } from "./announcement-utils";
 import { AnnouncementBrowser } from "./announcement-browser";
 
-type Notice = { kind: "success" | "error"; message: string };
 type AnnouncementWorkspaceMode = "admin" | "teacher" | "accountant" | "viewer";
 type AnnouncementClassOption = { id: string; name: string; level: string };
 
@@ -39,7 +39,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
   const [selected, setSelected] = useState<AnnouncementItem | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AnnouncementItem | null>(null);
-  const [notice, setNotice] = useState<Notice | null>(null);
+
   const [form, setForm] = useState<CreateAnnouncementInput>(() => emptyForm(mode));
 
   const announcementsQuery = useQuery({
@@ -81,12 +81,9 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
       ]);
       setIsCreateOpen(false);
       setForm(emptyForm(mode));
-      setNotice({
-        kind: "success",
-        message: input.status === "DRAFT" ? "Draft saved." : "Announcement published.",
-      });
+      toast.success(input.status === "DRAFT" ? "Draft saved." : "Announcement published.");
     },
-    onError: (error) => setNotice({ kind: "error", message: announcementErrorText(error) }),
+    onError: (error) => toast.error(announcementErrorText(error)),
   });
 
   const pinMutation = useMutation({
@@ -97,12 +94,9 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
       }),
     onSuccess: async (_, variables) => {
       await refreshAnnouncements();
-      setNotice({
-        kind: "success",
-        message: variables.isPinned ? "Announcement pinned." : "Announcement unpinned.",
-      });
+      toast.success(variables.isPinned ? "Announcement pinned." : "Announcement unpinned.");
     },
-    onError: (error) => setNotice({ kind: "error", message: announcementErrorText(error) }),
+    onError: (error) => toast.error(announcementErrorText(error)),
   });
 
   const statusMutation = useMutation({
@@ -116,12 +110,9 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
         refreshAnnouncements(),
         ...(variables.status === "PUBLISHED" ? [queryClient.invalidateQueries({ queryKey: ["notifications"] })] : []),
       ]);
-      setNotice({
-        kind: "success",
-        message: variables.status === "PUBLISHED" ? "Announcement published." : "Announcement moved to drafts.",
-      });
+      toast.success(variables.status === "PUBLISHED" ? "Announcement published." : "Announcement moved to drafts.");
     },
-    onError: (error) => setNotice({ kind: "error", message: announcementErrorText(error) }),
+    onError: (error) => toast.error(announcementErrorText(error)),
   });
 
   const deleteMutation = useMutation({
@@ -131,9 +122,9 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
       await refreshAnnouncements();
       setDeleteTarget(null);
       setSelected(null);
-      setNotice({ kind: "success", message: "Announcement deleted." });
+      toast.success("Announcement deleted.");
     },
-    onError: (error) => setNotice({ kind: "error", message: announcementErrorText(error) }),
+    onError: (error) => toast.error(announcementErrorText(error)),
   });
 
   const announcements = announcementsQuery.data ?? [];
@@ -151,7 +142,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
 
   function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setNotice(null);
+
     createMutation.mutate({
       ...form,
       title: form.title.trim(),
@@ -183,7 +174,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
 {mode !== "viewer" && (
           <button
             type="button"
-            onClick={() => { setForm(emptyForm(mode)); setNotice(null); setIsCreateOpen(true); }}
+            onClick={() => { setForm(emptyForm(mode));  setIsCreateOpen(true); }}
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
           >
             <Plus className="size-4" />
@@ -206,23 +197,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
         ))}
       </div>
 
-      {notice && (
-        <div
-          role={notice.kind === "error" ? "alert" : "status"}
-          className={cn(
-            "flex items-start gap-2 rounded-xl border px-4 py-3 text-sm",
-            notice.kind === "error"
-              ? "border-destructive/30 bg-destructive/10 text-destructive"
-              : "border-success/30 bg-success/10 text-success",
-          )}
-        >
-          <Bell className="mt-0.5 size-4 shrink-0" />
-          <span className="flex-1">{notice.message}</span>
-          <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss notice">
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
+
 
       <AnnouncementBrowser
         query={announcementsQuery}
@@ -534,7 +509,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
           <p className="text-sm text-muted-foreground">
             Delete <strong className="text-foreground">{deleteTarget?.title}</strong>? This action cannot be undone.
           </p>
-          {deleteMutation.isError && <p role="alert" className="text-sm text-destructive">{announcementErrorText(deleteMutation.error)}</p>}
+
           <div className="flex justify-end gap-2 border-t border-border pt-4">
             <button
               type="button"

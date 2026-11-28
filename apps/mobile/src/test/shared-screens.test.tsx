@@ -4,7 +4,7 @@ import NotificationsScreen from "../../app/(shared)/notifications";
 import NotificationHistoryScreen from "../../app/(shared)/notification-history";
 import DeliveryHistoryScreen from "../../app/(shared)/delivery-history";
 import NotificationSettingsScreen from "../../app/(shared)/notification-settings";
-import MessagesScreen from "../../app/(shared)/messages";
+import MessagesScreen from "@/features/shared/Messages";
 import ComposeMessageScreen from "../../app/(shared)/messages-new";
 import AnnouncementDetailsScreen from "../../app/(shared)/announcements/[id]";
 import ProfileScreen from "../../app/(shared)/profile";
@@ -55,6 +55,9 @@ jest.mock("@/features/announcements/queries", () => ({
   useAnnouncementsQuery: (...args: unknown[]) =>
     mockHooks.announcements(...args),
 }));
+jest.mock("@/components/Toast", () => ({
+  useToast: () => ({ show: jest.fn() }),
+}));
 jest.mock("@/features/shared/mutations", () => ({
   useScopedMutation: () => mockMutation,
 }));
@@ -99,7 +102,11 @@ jest.mock("expo-router", () => ({
 jest.mock("expo-image-picker", () => ({}));
 jest.mock("expo-image-manipulator", () => ({}));
 jest.mock("expo-file-system", () => ({ File: class File {} }));
+jest.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 jest.mock("@/theme/theme", () => ({
+  fonts: { bold: "InterBold", semibold: "InterSemibold" },
   spacing: { sm: 8, md: 12, lg: 16, xl: 24 },
   type: {
     body: {},
@@ -587,7 +594,9 @@ test("opening an inbox message marks it read and displays its thread", async () 
   await fireEvent.press(inbox.getByText("Welcome"));
 
   expect(mockMutation.mutate).toHaveBeenCalledWith("message-1");
-  expect(inbox.getByText("Welcome to the new term.")).toBeVisible();
+  expect(inbox.getByRole("header", { name: "Welcome" })).toBeVisible();
+  await fireEvent.press(inbox.getByTestId("modal-backdrop"));
+  expect(inbox.queryByRole("header", { name: "Welcome" })).toBeNull();
 });
 
 test("notification preferences show a loading skeleton", async () => {

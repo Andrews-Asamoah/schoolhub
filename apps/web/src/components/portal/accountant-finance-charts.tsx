@@ -14,6 +14,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { formatGhs as money } from "@/lib/format";
 interface FinanceSummary {
   billed: string;
   collected: string;
@@ -27,8 +28,6 @@ interface FinanceSummary {
 interface ExpenseRecord { amount: number | string; date: string; category?: string | null; customCategory?: { name: string } | null; registryCategory?: { name: string } | null; }
 interface Props { summary: FinanceSummary | null; expenses: ExpenseRecord[]; }
 
-const money = (value: number | string) =>
-  new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(Number(value) || 0);
 const tooltipStyle = { backgroundColor: "var(--popover)", border: "1px solid var(--border)", borderRadius: 12, color: "var(--popover-foreground)", fontSize: 12 };
 const tickStyle = { fill: "var(--muted-foreground)", fontSize: 11 };
 const CHART_COLORS = [

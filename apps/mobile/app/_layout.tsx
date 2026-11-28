@@ -13,21 +13,29 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { PortalDrawerProvider } from "@/components/PortalDrawer";
+import { openPortalTool } from "@/lib/portal-tools";
 import { ToastProvider, useToast } from "@/components/Toast";
 import { persistOptions, queryClient } from "@/lib/query-client";
 import { useSession, onSessionEvent } from "@/lib/session";
 import { restoreSession } from "@/lib/restore-session";
 import { canEnterRole, isAuthorizedSession } from "@/lib/permissions";
+import { useSchoolPush } from "@/features/shared/push";
 import { ThemeProvider, useTheme } from "@/theme/theme";
 
 void SplashScreen.preventAutoHideAsync();
 
 export { AppErrorBoundary as ErrorBoundary } from "@/components/AppErrorBoundary";
 
+function openPushUpdates() {
+  openPortalTool("/notifications");
+}
+
 function Shell() {
   const { isDark, reduceMotion } = useTheme();
   const session = useSession();
   const { show } = useToast();
+  useSchoolPush(openPushUpdates);
   useEffect(
     () =>
       onSessionEvent((event) => {
@@ -45,7 +53,7 @@ function Shell() {
   );
   const ready = isAuthorizedSession(session);
   return (
-    <>
+    <PortalDrawerProvider role={ready ? session.activeRole : null}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <Stack
         screenOptions={{
@@ -55,6 +63,7 @@ function Shell() {
         }}
       >
         <Stack.Screen name="index" />
+        <Stack.Screen name="password-recovery-link" />
         <Stack.Protected guard={!ready}>
           <Stack.Screen name="(auth)" />
         </Stack.Protected>
@@ -79,7 +88,7 @@ function Shell() {
           </Stack.Protected>
         ) : null}
       </Stack>
-    </>
+    </PortalDrawerProvider>
   );
 }
 

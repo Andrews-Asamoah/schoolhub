@@ -55,3 +55,44 @@ describe("StudentsService.getMyWardFees guardian isolation", () => {
     );
   });
 });
+
+describe("StudentsService.getProfileView student photo", () => {
+  it("projects the account image on a teacher-scoped student profile", async () => {
+    const image = "https://school.example/pupil.webp";
+    const findFirst = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "student-1" })
+      .mockResolvedValueOnce({
+        id: "student-1",
+        profile: { firstName: "Sample", lastName: "Pupil", user: { image } },
+        guardians: [],
+      });
+    const service = new StudentsService(
+      {
+        client: {
+          student: { findFirst },
+          enrollment: { findFirst: vi.fn().mockResolvedValue(null) },
+        },
+      } as never,
+      {} as never,
+    );
+
+    const profile = await service.getProfileView("school-1", "student-1", ["class-1"]);
+
+    expect(findFirst).toHaveBeenNthCalledWith(1, {
+      where: {
+        id: "student-1",
+        schoolId: "school-1",
+        deletedAt: null,
+        enrollments: { some: { classId: { in: ["class-1"] } } },
+      },
+      select: { id: true },
+    });
+    expect(profile.profile).toMatchObject({
+      firstName: "Sample",
+      lastName: "Pupil",
+      image,
+    });
+    expect(profile.profile).not.toHaveProperty("user");
+  });
+});

@@ -703,6 +703,11 @@ export const requestMarkCorrectionSchema = z.object({
     )
     .min(1, "Choose at least one mark to correct")
     .max(500),
+  /**
+   * Apply the correction now instead of sending it for approval. Only the owner or an administrator may;
+   * the API enforces that, so a schema that merely allows the field is not a grant of permission.
+   */
+  applyNow: z.boolean().default(false),
 });
 export type RequestMarkCorrectionInput = z.infer<typeof requestMarkCorrectionSchema>;
 
@@ -766,21 +771,46 @@ export const recordPaymentSchema = z.object({
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
 
+export const billingClassIdsSchema = z.array(z.string().min(1).max(100)).min(1, "Choose at least one class.").max(100);
+
 export const generateBillSchema = z.object({
   academicYearId: z.string().min(1),
   termId: z.string().optional(),
   feeStructureId: z.string().min(1),
-  classId: z.string().optional(),
-  studentId: z.string().optional(), // if targeting single student
+  classId: z.string().min(1).optional(),
+  classIds: billingClassIdsSchema.optional(),
+  studentId: z.string().min(1).optional(), // if targeting single student
   dueDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .iso.date()
     .optional(),
   notes: z.string().optional(),
-  /** Optional fee item IDs are explicit opt-ins; all mandatory items remain billable. */
+  /** Optional items explicitly selected for the whole batch by existing callers. */
   optionalItemIds: z.array(z.string().min(1)).max(100).default([]),
-});
+  /** Opt in only the students who use each optional service. */
+  optionalSelections: z.array(z.object({
+    feeItemId: z.string().min(1),
+    studentIds: z.array(z.string().min(1)).min(1).max(2000),
+  })).max(100).optional(),
+}).refine(input => !!(input.studentId || input.classId || input.classIds), { message: "Choose at least one class or a student." })
+  .refine(input => !input.classIds || (!input.classId && !input.studentId), { message: "Choose either multiple classes or a single class or student." });
 export type GenerateBillInput = z.infer<typeof generateBillSchema>;
+
+export const teacherPayslipSchema = z.object({
+  id: z.string(),
+  basicSalary: z.string(),
+  allowances: z.string(),
+  grossSalary: z.string(),
+  incomeTax: z.string(),
+  ssnitEmployee: z.string(),
+  otherDeductions: z.string(),
+  netSalary: z.string(),
+  payrollRecord: z.object({
+    month: z.number().int().min(1).max(12),
+    year: z.number().int(),
+    status: z.enum(["APPROVED", "PAID"]),
+  }),
+});
+export type TeacherPayslip = z.infer<typeof teacherPayslipSchema>;
 
 export type StudentStatementEntryType =
   | "INVOICE"
@@ -906,6 +936,12 @@ export const schoolHubtelConnectionSchema = z.object({
   apiBaseUrl: z.enum(["https://sms.hubtel.com/v1/messages", "https://smsc.hubtel.com/v1/messages"]).default("https://sms.hubtel.com/v1/messages"),
 });
 export type SchoolHubtelConnectionInput = z.infer<typeof schoolHubtelConnectionSchema>;
+
+export const schoolAccessIdentifierSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, "Enter a school code or address prefix using letters, numbers or hyphens.");
 
 export const enrollSchoolSchema = z.object({
   // School details
@@ -1873,6 +1909,12 @@ export const createReportSetSchema = z.object({
 });
 export type CreateReportSetInput = z.infer<typeof createReportSetSchema>;
 
+/** Reopen a published report batch so its reports can be corrected and approved again. */
+export const reopenReportSetSchema = z.object({
+  reason: z.string().trim().min(10, "Give a reason of at least 10 characters").max(500),
+});
+export type ReopenReportSetInput = z.infer<typeof reopenReportSetSchema>;
+
 /** What an assessment is for. Mirrors the AssessmentCategory enum in the API schema. */
 export const ASSESSMENT_CATEGORIES = ["TERMLY", "MOCK"] as const;
 export type AssessmentCategoryValue = (typeof ASSESSMENT_CATEGORIES)[number];
@@ -2237,3 +2279,42 @@ export function commonWeight(weights: readonly (number | null | undefined)[]): n
 }
 
 export * from "./sync.js";
+export const externalResultStatusSchema = z.enum(["GRADED", "ABSENT", "WITHHELD", "CANCELLED"]);
+
+const externalResultRowSchema=z.object({
+  candidateId:z.string().min(1),
+  status:externalResultStatusSchema,
+  grade:z.number().int().min(1).max(9).nullable(),
+  expectedVersion:z.number().int().min(0),
+}).strict().superRefine((row,ctx)=>{
+  if((row.status==="GRADED")!==(row.grade!==null))ctx.addIssue({
+    code:"custom",path:["grade"],message:"Only a graded result has a grade between 1 and 9.",
+  });
+});
+export const externalResultBatchSchema=z.object({
+  paperId:z.string().min(1),
+  sourceReference:z.string().trim().min(5).max(200),
+  entries:z.array(externalResultRowSchema).min(1).max(120),
+}).strict().superRefine((input,ctx)=>{
+  const ids=input.entries.map(row=>row.candidateId);
+  if(ids.length!==new Set(ids).size)ctx.addIssue({code:"custom",path:["entries"],
+    message:"Duplicate candidates in one submission are not allowed."});
+});
+
+export const createSchoolAssignmentSchema = z.object({
+  classId: z.string().trim().min(1).max(100),
+  subjectId: z.string().trim().min(1).max(100),
+  title: z.string().trim().min(3).max(160),
+  instructions: z.string().trim().min(1).max(10_000),
+  dueAt: z.iso.datetime().nullable().optional(),
+  maxScore: z.number().finite().positive().max(100_000),
+});
+export const publishAssignmentBatchSchema = createSchoolAssignmentSchema
+  .omit({ classId: true })
+  .extend({
+    classIds: z.array(createSchoolAssignmentSchema.shape.classId).min(1).max(50)
+      .refine((ids) => ids.length === new Set(ids).size, "Choose each class once."),
+  });
+export type PublishAssignmentBatchInput = z.infer<typeof publishAssignmentBatchSchema>;
+
+export { formatPersonName } from "./person-name.js";

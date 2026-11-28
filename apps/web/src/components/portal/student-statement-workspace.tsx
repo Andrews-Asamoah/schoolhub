@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -9,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { downloadXlsx } from "@/lib/download";
 
+import { formatGhs as money } from "@/lib/format";
 interface StudentOption {
   id: string;
   studentId?: string;
@@ -35,8 +37,6 @@ interface StudentPage {
 
 type Scope = "term" | "year" | "all";
 
-const money = (value: string | number) =>
-  new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0);
 
 const inputClass = "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/30";
 const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50";
@@ -286,13 +286,13 @@ export function StudentStatementWorkspace() {
             </div>
             <p className="mt-4 rounded-xl border border-border bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">This statement is currently reconstructed from existing bills and receipt allocations. The receivables-ledger implementation will become the permanent accounting source of truth in a later phase. Previous-balance snapshots are not treated as a second charge.</p>
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[880px] text-left text-sm">
-                <thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3">Reference</th><th className="p-3">Description</th><th className="p-3 text-right">Amount</th><th className="p-3 text-right">Running balance</th></tr></thead>
-                <tbody>
-                  {statementRows.length ? statementRows.map((row) => <tr key={row.id} className="border-b border-border/70 last:border-0"><td className="whitespace-nowrap p-3">{row.date}</td><td className="p-3">{row.type}</td><td className="p-3 font-medium">{row.reference}</td><td className="p-3">{row.description}</td><td className={cn("p-3 text-right tabular-nums", Number(row.amount) < 0 ? "text-success" : "text-foreground")}>{money(row.amount)}</td><td className="p-3 text-right font-semibold tabular-nums">{money(row.runningBalance)}</td></tr>) : <tr><td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">No statement activity in this scope.</td></tr>}
-                </tbody>
-                <tfoot><tr className="border-t-2 border-border font-bold"><td className="p-3" colSpan={4}>Closing balance</td><td className="p-3 text-right">—</td><td className="p-3 text-right tabular-nums">{money(statement.closingBalance)}</td></tr></tfoot>
-              </table>
+              <Table scroll={false} className="w-full min-w-[880px] text-left text-sm">
+                <TableHeader><TableRow className="border-b border-border text-xs text-muted-foreground"><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-right">Running balance</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {statementRows.length ? statementRows.map((row) => <TableRow key={row.id} className="border-b border-border/70 last:border-0"><TableCell className="whitespace-nowrap">{row.date}</TableCell><TableCell>{row.type}</TableCell><TableCell className="font-medium">{row.reference}</TableCell><TableCell>{row.description}</TableCell><TableCell className={cn("text-right tabular-nums", Number(row.amount) < 0 ? "text-success" : "text-foreground")}>{money(row.amount)}</TableCell><TableCell className="text-right font-semibold tabular-nums">{money(row.runningBalance)}</TableCell></TableRow>) : <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No statement activity in this scope.</TableCell></TableRow>}
+                </TableBody>
+                <TableFooter><TableRow className="border-t-2 border-border font-bold"><TableCell colSpan={4}>Closing balance</TableCell><TableCell className="text-right tabular-nums">—</TableCell><TableCell className="text-right tabular-nums">{money(statement.closingBalance)}</TableCell></TableRow></TableFooter>
+              </Table>
             </div>
             <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
               {[

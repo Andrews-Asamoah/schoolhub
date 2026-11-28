@@ -428,7 +428,7 @@ export class PeopleService {
                 select: {
                   id: true,
                   admissionNumber: true,
-                  profile: { select: { firstName: true, lastName: true } },
+                  profile: { select: { firstName: true, otherNames: true, lastName: true } },
                 },
               },
             },
@@ -550,7 +550,7 @@ export class PeopleService {
                 select: {
                   id: true,
                   admissionNumber: true,
-                  profile: { select: { firstName: true, lastName: true } },
+                  profile: { select: { firstName: true, otherNames: true, lastName: true } },
                 },
               },
             },
@@ -917,7 +917,7 @@ export class PeopleService {
                 select: {
                   id: true,
                   admissionNumber: true,
-                  profile: { select: { firstName: true, lastName: true } },
+                  profile: { select: { firstName: true, otherNames: true, lastName: true } },
                 },
               },
             },

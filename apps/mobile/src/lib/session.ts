@@ -55,9 +55,12 @@ export const sessionStorage: SessionStorage = {
     if (entries.length) await AsyncStorage.multiSet(entries);
   },
 };
-export const sessionStore = createSessionStore(sessionStorage, async () => {
-  await wipeQueryCache();
-});
+export const sessionStore = createSessionStore(
+  sessionStorage,
+  async (preserveRegister) => {
+    await wipeQueryCache(preserveRegister);
+  },
+);
 export const useSession = () =>
   useSyncExternalStore(
     sessionStore.subscribe,

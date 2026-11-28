@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import {BadRequestException,ConflictException,ForbiddenException,Injectable,NotFoundException} from "@nestjs/common";
 import {Prisma} from "@prisma/client";
 import type {z} from "zod";
@@ -69,7 +70,7 @@ export class ExternalExamsService {
         where:{classId:input.classId,academicYearId:input.academicYearId,
           status:{in:["ACTIVE","COMPLETED"]},student:{schoolId,deletedAt:null}},
         select:{studentId:true,student:{select:{
-          admissionNumber:true,profile:{select:{firstName:true,lastName:true}},
+          admissionNumber:true,profile:{select:{firstName:true,otherNames:true,lastName:true}},
         }}},orderBy:{studentId:"asc"},
       }),
     ]);
@@ -92,7 +93,7 @@ export class ExternalExamsService {
           examYear:input.examYear,name:"BECE "+input.examYear,createdById:userId,
           candidates:{create:roster.map(x=>({
             studentId:x.studentId,
-            nameSnapshot:[x.student.profile.firstName,x.student.profile.lastName].filter(Boolean).join(" "),
+            nameSnapshot:formatPersonName(x.student.profile),
             admissionNumberSnapshot:x.student.admissionNumber,
           }))},
           papers:{create:classroom.subjects.map(x=>({

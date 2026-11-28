@@ -91,7 +91,8 @@ jobs:
 
   validate:
     name: Validate proposed changes
-    runs-on: ubuntu-latest
+    # The pinned Playwright release supports Ubuntu 24.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     services:
       postgres:
@@ -140,6 +141,8 @@ jobs:
           pnpm --filter @schoolhub/mobile typecheck
       - name: Web build
         run: pnpm --filter @schoolhub/web build
+      - name: Web first-load bundle budget
+        run: pnpm --filter @schoolhub/web check:bundle
       - name: Check controller route inventory
         run: node apps/api/scripts/route-inventory.mjs --check
       - name: Validate release manifest contracts

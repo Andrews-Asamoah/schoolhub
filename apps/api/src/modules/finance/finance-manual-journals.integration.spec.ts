@@ -26,7 +26,7 @@ describe.skipIf(!enabled)("P2 manual journal lifecycle (PostgreSQL)", { timeout:
     db = prisma;
     service = new FinanceManualJournalsService(
       { client: db } as never,
-      new FinancePostingService({ client: db } as never),
+      new FinancePostingService(),
     );
     await db.organization.create({ data: { id: run + "-org", name: run, slug: run } });
     schoolId = (await db.school.create({

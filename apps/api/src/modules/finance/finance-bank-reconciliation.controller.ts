@@ -57,6 +57,22 @@ export class FinanceBankReconciliationController {
   import(@CurrentSchool() school: School, @CurrentUser() actor: AuthenticatedUser, @Body() body: { input?: string }, @UploadedFile() file?: Express.Multer.File) {
     const upload = uploadInput(body, file); return this.service.import(school.id, actor.id, upload.file, upload.input);
   }
+  @Get(":id/suggested-matches")
+  @Roles(...FINANCE_READ_ROLES)
+  @Header("Cache-Control", "private, no-store")
+  suggestMatches(@CurrentSchool() school: School, @Param("id") id: string) {
+    return this.service.suggestMatches(school.id, id);
+  }
+
+  @Post(":id/suggested-matches")
+  @Roles(...FINANCE_WRITE_ROLES)
+  applySuggestedMatches(
+    @CurrentSchool() school: School, @CurrentUser() actor: AuthenticatedUser, @Param("id") id: string, @Body() body: unknown,
+  ) {
+    const choices = parse(z.array(z.object({ statementLineId: z.string().min(1), transactionId: z.string().min(1) })).min(1).max(5_000), body);
+    return this.service.applySuggestedMatches(school.id, actor.id, id, choices);
+  }
+
   @Post(":id/matches") @Roles(...FINANCE_WRITE_ROLES)
   match(@CurrentSchool() school: School, @CurrentUser() actor: AuthenticatedUser, @Param("id") id: string, @Body() body: unknown) {
     return this.service.match(school.id, actor.id, id, parse(z.object({ statementLineId: z.string().min(1), transactionId: z.string().min(1), amount: z.string().regex(/^\d{1,13}(?:\.\d{1,2})?$/) }), body));

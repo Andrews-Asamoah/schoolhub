@@ -5,12 +5,11 @@ import {
   type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
 import { useCallback, type ReactNode, type RefObject } from "react";
-import { StyleSheet, useWindowDimensions } from "react-native";
+import { useWindowDimensions } from "react-native";
 import { Text } from "@/components/Typography";
 import { radius, spacing, type, useTheme } from "@/theme/theme";
 import { ReduceMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GlassSurface } from "./GlassSurface";
 
 type Props = {
   sheetRef: RefObject<BottomSheetModal | null>;
@@ -19,9 +18,9 @@ type Props = {
   snapPoints?: (string | number)[];
 };
 
-/** Glass bottom sheet. Needs <BottomSheetModalProvider> (mounted in the root layout). */
+/** Opaque bottom sheet. Needs <BottomSheetModalProvider> (mounted in the root layout). */
 export function Sheet({ sheetRef, title, children, snapPoints }: Props) {
-  const { colors, glass, reduceMotion } = useTheme();
+  const { colors, reduceMotion } = useTheme();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const backdrop = useCallback(
@@ -46,17 +45,12 @@ export function Sheet({ sheetRef, title, children, snapPoints }: Props) {
       enableDynamicSizing={!snapPoints}
       snapPoints={snapPoints}
       backdropComponent={backdrop}
-      backgroundComponent={() => (
-        <GlassSurface
-          radius={radius.sheet}
-          strong
-          style={StyleSheet.absoluteFill}
-          contentStyle={StyleSheet.absoluteFill}
-        >
-          {null}
-        </GlassSurface>
-      )}
-      handleIndicatorStyle={{ backgroundColor: glass.border, width: 40 }}
+      enablePanDownToClose
+      backgroundStyle={{
+        backgroundColor: colors.popover,
+        borderRadius: radius.sheet,
+      }}
+      handleIndicatorStyle={{ backgroundColor: colors.border, width: 40 }}
     >
       <BottomSheetScrollView
         contentContainerStyle={{

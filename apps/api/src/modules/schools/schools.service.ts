@@ -101,6 +101,26 @@ export class SchoolsService {
     return school;
   }
 
+  async findSchoolsForAccess(identifier: string) {
+    // Both fields are unique and indexed. A code can also be another school's
+    // subdomain, so return both matches and let the person verify the name.
+    return this.prisma.client.school.findMany({
+      where: {
+        OR: [{ code: identifier.toUpperCase() }, { subdomain: identifier }],
+      },
+      select: {
+        name: true,
+        subdomain: true,
+        code: true,
+        logo: true,
+        primaryColor: true,
+        secondaryColor: true,
+      },
+      orderBy: { subdomain: "asc" },
+      take: 2,
+    });
+  }
+
   async getPublicSchoolBySubdomain(subdomain: string) {
     const school = await this.prisma.client.school.findUnique({
       where: { subdomain: subdomain.toLowerCase().trim() },

@@ -1,3 +1,5 @@
+import { router } from "expo-router";
+import { Button } from "@/components/Button";
 import { CalendarDays } from "lucide-react-native";
 import { View } from "react-native";
 import { Card } from "@/components/Surface";
@@ -27,6 +29,13 @@ export default function GuardianAttendanceScreen() {
       onRefresh={() => void query.refetch()}
     >
       <View style={{ gap: spacing.lg }}>
+        {activeWard ? (
+          <Button
+            label="Absence requests"
+            variant="secondary"
+            onPress={() => router.push("/(guardian)/absence-requests")}
+          />
+        ) : null}
         {!activeWard ? (
           <EmptyState
             title="No child selected"

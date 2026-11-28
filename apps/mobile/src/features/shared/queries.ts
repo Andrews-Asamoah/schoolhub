@@ -1,15 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   getCurrentAcademicContext,
   getCurrentSession,
   getMyProfile,
   getNotificationPreferences,
   listDeliveryHistory,
-  listInboxMessages,
+  listInboxPage,
   listMessageRecipients,
   listNotificationHistory,
   listNotifications,
-  listSentMessages,
+  listSentPage,
   type NotificationHistoryOptions,
 } from "@/api/shared";
 import { isMobileRole, type MobileRole } from "@/lib/permissions";
@@ -91,12 +91,18 @@ export function useDeliveryHistoryQuery() {
   });
 }
 
-export function useMessagesQuery(folder: "inbox" | "sent") {
+export function useMessagesQuery(folder: "inbox" | "sent", search = "") {
   const scope = useScope();
-  return useQuery({
-    queryKey: sharedKeys.messages(scope, folder),
-    queryFn: ({ signal }) =>
-      (folder === "inbox" ? listInboxMessages : listSentMessages)({ signal }),
+  return useInfiniteQuery({
+    queryKey: [...sharedKeys.messages(scope, folder), search],
+    initialPageParam: null as string | null,
+    queryFn: ({ signal, pageParam }) =>
+      (folder === "inbox" ? listInboxPage : listSentPage)({
+        signal,
+        query: { cursor: pageParam, search, limit: 30 },
+      }),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    select: (data) => data.pages.flatMap((page) => page.items),
     enabled: scope.enabled,
     meta: { persist: false },
   });

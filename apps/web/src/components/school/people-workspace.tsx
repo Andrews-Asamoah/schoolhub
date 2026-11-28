@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { PersonPhotoPicker, uploadPersonPhoto } from "./person-photo-picker";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,6 +25,7 @@ import {
   type CredentialEntry,
 } from "@/components/credentials/credentials-dialog";
 import {
+  formatPersonName,
   createGuardianSchema,
   createStaffSchema,
   createTeacherSchema,
@@ -97,7 +99,7 @@ interface StudentOption {
   id: string;
   admissionNumber: string | null;
   status: string;
-  profile: { firstName: string; lastName: string };
+  profile: { firstName: string; otherNames?: string | null; lastName: string };
   class: { id: string; name: string; level: string } | null;
 }
 
@@ -168,7 +170,7 @@ interface Guardian {
     student: {
       id: string;
       admissionNumber: string | null;
-      profile: { firstName: string; lastName: string };
+      profile: { firstName: string; otherNames?: string | null; lastName: string };
     };
   }[];
 }
@@ -257,7 +259,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const [viewing, setViewing] = useState<{ id: string; name: string } | null>(null);
   const [confirmingLogin, setConfirmingLogin] = useState<{ id: string; name: string; hasLogin: boolean } | null>(null);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
+
   const isGuardianPage = kind === "guardians";
   const canManage =
     ["owner", "admin", "headteacher"].includes(activeRole ?? "") ||
@@ -342,14 +344,12 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       });
     },
     onSuccess: async (created, values) => {
-      setNotice(
-        !editing && created.linkedExistingAccount
-          ? `${values.firstName} ${values.lastName} already has an account at this school. It now also has this role, and they keep signing in with their own password. No new password was created.`
-          : null,
-      );
+      if (!editing && created.linkedExistingAccount) {
+        toast.success(`${values.firstName} ${values.lastName} can sign in to the new role with their existing password.`);
+      }
       if (kind === "teachers" && photo) {
         try { await uploadPersonPhoto("teacher", editing?.id ?? created.id, photo); }
-        catch { setNotice("Teacher saved, but the image upload failed. Edit the teacher to try uploading the image again."); }
+        catch { toast.error("Teacher saved, but the image upload failed. Edit the teacher to try uploading the image again."); }
       }
       setPhoto(null);
       if (!editing && created.credentials) {
@@ -1123,12 +1123,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         />
       )}
       <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
-      {notice && (
-        <p role="status" className="flex items-start justify-between gap-3 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-xs text-success">
-          <span>{notice}</span>
-          <button type="button" onClick={() => setNotice(null)} className="font-semibold underline-offset-2 hover:underline">Dismiss</button>
-        </p>
-      )}
+
       <WorkspaceDataTable
         rows={rows}
         columns={columns}
@@ -1315,7 +1310,7 @@ function toRow(person: Teacher | Staff | Guardian): Row {
     relatedStudents: guardian.students
       .map(
         ({ student }) =>
-          `${student.profile.firstName} ${student.profile.lastName}`,
+          formatPersonName(student.profile),
       )
       .join(", "),
     isActive: guardian.isActive,
@@ -1458,11 +1453,11 @@ function StudentSearchPicker({
               key={student.id}
               className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary"
             >
-              {student.profile.firstName} {student.profile.lastName}
+              {formatPersonName(student.profile)}
               <button
                 type="button"
                 onClick={() => removeStudent(student.id)}
-                aria-label={`Remove ${student.profile.firstName} ${student.profile.lastName}`}
+                aria-label={`Remove ${formatPersonName(student.profile)}`}
                 className="rounded-full p-0.5 hover:bg-primary/15"
               >
                 <X className="size-3" />
@@ -1508,7 +1503,7 @@ function StudentSearchPicker({
               >
                 <span className="min-w-0">
                   <span className="block truncate text-xs font-semibold text-foreground">
-                    {student.profile.firstName} {student.profile.lastName}
+                    {formatPersonName(student.profile)}
                   </span>
                   <span className="block truncate text-[11px] font-normal text-muted-foreground">
                     {student.class?.name ?? "Not placed this term"}
@@ -1575,7 +1570,7 @@ function GuardianDetailsDialog({
   const loginEmail = guardian.profile?.user.email;
   const students = guardian.students.map(({ student }) => ({
     id: student.id,
-    name: [student.profile.firstName, student.profile.lastName].filter(Boolean).join(" "),
+    name: formatPersonName(student.profile),
     admissionNumber: student.admissionNumber,
   }));
 

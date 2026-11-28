@@ -5,7 +5,7 @@ import { Screen } from "@/components/Screen";
 
 export default function Page() {
   return (
-    <Screen title="Home" subtitle="Floating glass tab bar demo">
+    <Screen title="Home" subtitle="Portal navigation demo">
       <Card>
         <Button
           label="Back to gallery"

@@ -1,3 +1,4 @@
+import { reportApprovalSchema, reportDataSchema } from "./report-preview";
 import { z } from "zod";
 import { defineDownload, defineEndpoint } from "./endpoint";
 
@@ -263,6 +264,8 @@ const publishedReportSchema = z.object({
   id: z.string(),
   publishedAt: z.string(),
   pdfAvailable: z.boolean(),
+  data: reportDataSchema.nullish().catch(null),
+  approval: reportApprovalSchema.nullish().catch(null),
   set: z.object({
     name: z.string(),
     academicYear: z.object({ name: z.string() }),

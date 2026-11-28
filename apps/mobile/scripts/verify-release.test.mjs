@@ -26,8 +26,15 @@ function verify(sources) {
 
 test("accepts the production entry sources", () => {
   assert.equal(
-    verify(["/repo/apps/mobile/app/_layout.tsx", "../app/(auth)/login.tsx"])
-      .status,
+    verify([
+      "/repo/apps/mobile/app/_layout.tsx",
+      "../app/(auth)/login.tsx",
+      "../app/+native-intent.tsx",
+      "../app/(teacher)/teacher-external-exams.tsx",
+      "../src/features/teacher/ExternalExams.tsx",
+      "../src/api/teacher-external-exams.ts",
+      "../app/password-recovery-link.tsx",
+    ]).status,
     0,
   );
 });
@@ -41,6 +48,8 @@ for (const route of [
   "(accountant)/index.tsx",
   "(admin)/index.tsx",
   "(student)/bece.tsx",
+  "(guardian)/guardian-external-exams.tsx",
+  "(shared)/external-exams.tsx",
 ]) {
   test(`rejects bundled route ${route}`, () => {
     const result = verify([`/repo/apps/mobile/app/${route}`]);
