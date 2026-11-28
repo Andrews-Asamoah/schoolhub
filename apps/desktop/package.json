@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test spike/*.test.mjs",
-    "check": "node spike/check-config.mjs"
+    "check": "node spike/check-config.mjs",
+    "build:windows": "node scripts/build-windows.mjs"
   }
 }
