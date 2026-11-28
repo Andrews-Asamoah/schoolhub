@@ -1,3 +1,4 @@
+import { DESKTOP_PLAN_FEATURE } from "@schoolhub/shared";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, Save, X } from "lucide-react";
@@ -24,7 +25,7 @@ type Capacity = typeof capacities[number][0];
 type Draft = {
   code: string; name: string; description: string; currency: string;
   monthlyPrice: string; yearlyPrice: string; sortOrder: string; featuresText: string;
-  isPublic: boolean; isActive: boolean;
+  isPublic: boolean; isActive: boolean; desktopEnabled: boolean;
 } & Record<Capacity, string | null>;
 type Errors = Partial<Record<keyof Draft, string>>;
 
@@ -33,7 +34,8 @@ function makeDraft(plan: SubscriptionPlan | null): Draft {
     code: plan?.code ?? "", name: plan?.name ?? "", description: plan?.description ?? "",
     currency: plan?.currency ?? "GHS", monthlyPrice: String(plan?.monthlyPrice ?? ""),
     yearlyPrice: String(plan?.yearlyPrice ?? ""), sortOrder: String(plan?.sortOrder ?? 0),
-    featuresText: plan?.features.join("\n") ?? "Attendance\nAssessments\nReport cards",
+    featuresText: plan ? (Array.isArray(plan.features) ? plan.features.filter(value => value !== DESKTOP_PLAN_FEATURE).join("\n") : "") : "Attendance\nAssessments\nReport cards",
+    desktopEnabled: Array.isArray(plan?.features) && plan.features.includes(DESKTOP_PLAN_FEATURE),
     isPublic: plan?.isPublic ?? true, isActive: plan?.isActive ?? true,
     ...Object.fromEntries(capacities.map(([key, , fallback]) => [key, plan ? plan[key] === null ? null : String(plan[key]) : fallback])) as Record<Capacity, string | null>,
   };
@@ -57,7 +59,7 @@ function validate(draft: Draft): Errors {
   }
   if (!/^\d+$/.test(draft.sortOrder) || Number(draft.sortOrder) > 100_000) errors.sortOrder = "Enter a whole number from 0 to 100,000.";
   const features = draft.featuresText.split("\n").map(value => value.trim()).filter(Boolean);
-  if (features.length > 40 || features.some(value => value.length > 80)) errors.featuresText = "Use up to 40 features, with 80 characters or fewer per line.";
+  if (features.length + Number(draft.desktopEnabled) > 40 || features.some(value => value.length > 80)) errors.featuresText = "Use up to 40 features, with 80 characters or fewer per line.";
   return errors;
 }
 
@@ -75,12 +77,12 @@ export function SubscriptionPlanEditor({ plan, onClose, onSaved }: {
   const dirty = JSON.stringify(initial) !== JSON.stringify(draft);
   const save = useMutation({
     mutationFn: () => {
-      const { featuresText, ...fields } = draft;
+      const { featuresText, desktopEnabled, ...fields } = draft;
       const body = {
         ...fields, code: draft.code.trim(), name: draft.name.trim(), description: draft.description.trim() || null,
         monthlyPrice: Number(draft.monthlyPrice), yearlyPrice: Number(draft.yearlyPrice), sortOrder: Number(draft.sortOrder),
         ...Object.fromEntries(capacities.map(([key]) => [key, draft[key] === null ? null : Number(draft[key])])),
-        features: [...new Set(featuresText.split("\n").map(value => value.trim()).filter(Boolean))],
+        features: [...new Set([...featuresText.split("\n").map(value => value.trim()).filter(value => value && value !== DESKTOP_PLAN_FEATURE), ...(desktopEnabled ? [DESKTOP_PLAN_FEATURE] : [])])],
       };
       return apiFetch<SubscriptionPlan>(plan ? `/super-admin/subscription-plans/${plan.id}` : "/super-admin/subscription-plans", {
         method: plan ? "PATCH" : "POST", body: JSON.stringify(body),
@@ -170,6 +172,7 @@ export function SubscriptionPlanEditor({ plan, onClose, onSaved }: {
             </div>)}
           </Section>
           <Section title="Features" description="List the features included in this plan, one per line.">
+            <label className="flex items-start gap-3 text-sm sm:col-span-2"><input type="checkbox" checked={draft.desktopEnabled} onChange={e => set("desktopEnabled", e.target.checked)} className="mt-1 size-4 accent-primary" /><span><span className="block font-semibold">Desktop app access</span><span className="mt-1 block text-xs text-muted-foreground">Enable the desktop app for schools assigned to this plan. School overrides take precedence.</span></span></label>
             <div className="sm:col-span-2">{field("Included features", "featuresText", <Textarea {...fieldProps("featuresText")} value={draft.featuresText} onChange={e => set("featuresText", e.target.value)} rows={4} placeholder={"Attendance\nAssessments\nReport cards"} />, "Up to 40 features · 80 characters per line. Existing feature names are preserved.")}</div>
           </Section>
           <Section title="Availability" description="Control whether this plan is available for assignment and visible to schools.">

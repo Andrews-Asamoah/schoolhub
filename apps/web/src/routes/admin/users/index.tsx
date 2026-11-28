@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/superadmin/page-header";
 import { Pagination } from "@/components/superadmin/pagination";
 import { SearchInput } from "@/components/superadmin/search-input";
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/superadmin/state-panels";
-import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 

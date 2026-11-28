@@ -7,7 +7,7 @@ import {
   MIN_RECOMMENDATION_LENGTH, ReportRecommendationTable,
   type RecommendationRowState, type RecommendationTableRow,
 } from "@/components/reports/report-recommendation-table";
-import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { ReportVersionViewer } from "@/components/school/report-version-viewer";
 import { apiFetch, errorText } from "@/lib/api";
 

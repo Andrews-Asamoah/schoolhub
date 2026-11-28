@@ -3,6 +3,7 @@
 // ============================================================================
 
 model School {
+  syncDevices SyncDevice[]
   attendanceExcuseRequests AttendanceExcuseRequest[]
   payrollPaymentDetails PayrollPaymentDetails[]
   studentDeletionRequests StudentDeletionRequest[]

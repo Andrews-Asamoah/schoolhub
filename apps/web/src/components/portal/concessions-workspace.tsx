@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { LabeledField } from "@/components/forms/labeled-controls";
-import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { authClient } from "@/lib/auth-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BadgeCheck, CalendarDays, CheckCircle2, GraduationCap, HeartHandshake, LoaderCircle, Plus, Search, ShieldCheck, ToggleLeft, ToggleRight, X } from "lucide-react";

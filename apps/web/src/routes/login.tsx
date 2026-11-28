@@ -1,3 +1,4 @@
+import { platform } from "@schoolhub/platform";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
@@ -8,7 +9,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { studentLoginEmail } from "@schoolhub/shared";
 import { apiFetch, getClientSubdomain } from "@/lib/api";
@@ -20,6 +21,8 @@ import { TwoFactorChallenge } from "@/components/auth/two-factor-challenge";
 export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
+
+const DesktopSessionControls = import.meta.env.VITE_TARGET === "desktop" ? lazy(() => import("@/lib/platform/desktop/session-controls")) : null;
 
 const chartBars = [42, 58, 49, 75, 63, 88, 70, 96, 77, 100, 84, 91];
 
@@ -68,6 +71,7 @@ function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logoutNotice, setLogoutNotice] = useState<string | null>(null);
@@ -86,10 +90,10 @@ function LoginPage() {
   const school = tenantData?.school;
 
   useEffect(() => {
-    if (sessionPending || !session?.user) return;
+    if (sessionPending || loading || needsTwoFactor || !session?.user) return;
 
     void finishSignIn(session.user);
-  }, [finishSignIn, session, sessionPending]);
+  }, [finishSignIn, session, sessionPending, loading, needsTwoFactor]);
 
   useEffect(() => {
     if (sessionPending || session?.user) return;
@@ -106,6 +110,14 @@ function LoginPage() {
         </div>
       </main>
     );
+  }
+
+  async function finishInteractiveSignIn(user: Parameters<typeof finishSignIn>[0]) {
+    if (rememberDevice && platform.rememberSession) {
+      try { await platform.rememberSession(); }
+      catch { platform.savedSignInWarning?.(); }
+    }
+    await finishSignIn(user);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -128,6 +140,7 @@ function LoginPage() {
         ).catch(() => null);
         loginEmail = resolved?.email ?? studentLoginEmail(loginEmail, schoolSub);
       }
+      if (subdomain) await platform.prepareSignIn?.(subdomain);
       const result = await signIn.email({ email: loginEmail, password });
       if (result.error) {
         setError(result.error.message ?? "Sign-in failed. Check your details and try again.");
@@ -143,7 +156,7 @@ function LoginPage() {
         return;
       }
 
-      await finishSignIn(result.data?.user);
+      await finishInteractiveSignIn(result.data?.user);
     } catch {
       setError("We couldn’t connect. Check your internet connection and try again.");
     } finally {
@@ -282,7 +295,7 @@ function LoginPage() {
 
           {needsTwoFactor ? (
             <TwoFactorChallenge
-              onVerified={finishSignIn}
+              onVerified={finishInteractiveSignIn}
               allowTrustDevice={!subdomain}
               onCancel={() => { setNeedsTwoFactor(false); setError(null); }}
             />
@@ -320,6 +333,9 @@ function LoginPage() {
             </div>
           )}
 
+          {DesktopSessionControls && subdomain && <Suspense fallback={null}>
+            <DesktopSessionControls school={subdomain} address={email} disabled={loading} onResumed={finishSignIn} />
+          </Suspense>}
           <form onSubmit={(event) => void handleSubmit(event)} className="space-y-5">
             <div>
               <label
@@ -385,6 +401,11 @@ function LoginPage() {
                 </button>
               </div>
             </div>
+
+            {import.meta.env.VITE_TARGET === "desktop" && <label className="flex items-start gap-3 text-sm">
+              <input type="checkbox" checked={rememberDevice} onChange={event => setRememberDevice(event.target.checked)} className="mt-1 size-4 accent-primary" />
+              <span>Save this sign-in on this Windows account<span className="mt-1 block text-xs text-muted-foreground">Use this only on a personal Windows account. Anyone using that account can restore a saved sign-in.</span></span>
+            </label>}
 
             <button
               type="submit"

@@ -1,3 +1,4 @@
+import { platform } from "@schoolhub/platform";
 import { createAuthClient } from "better-auth/react";
 
 /**
@@ -21,7 +22,8 @@ import {
 } from "better-auth/client/plugins";
 
 export const authClient = createAuthClient({
-  baseURL: window.location.origin,
+  baseURL: platform.authOrigin,
+  ...platform.authOptions,
   basePath: "/api/auth",
   plugins: [
     organizationClient(),

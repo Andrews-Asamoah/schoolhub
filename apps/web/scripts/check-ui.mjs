@@ -45,7 +45,7 @@ function* walk(dir) {
 const failures = [];
 for (const file of walk(SRC)) {
   const rel = path.relative(SRC, file).split(path.sep).join("/");
-  const lines = fs.readFileSync(file, "utf8").split("\n");
+  const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((line, index) => {
     if (line.includes("ui-allow:")) return;
     const code = line.replace(/^\s*(\/\/|\*|\/\*).*$/, ""); // ignore comment-only lines

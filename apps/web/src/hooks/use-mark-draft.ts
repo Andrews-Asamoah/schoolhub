@@ -4,6 +4,7 @@ import { useSession } from "@/lib/auth-client";
 import { confirmAction } from "@/components/ui/confirm-host";
 
 const dirtyEditors = new Set<symbol>();
+export function hasUnsavedMarks() { return dirtyEditors.size > 0; }
 export async function confirmLeavingDrafts(): Promise<boolean> {
   if (dirtyEditors.size === 0) return true;
   return confirmAction({

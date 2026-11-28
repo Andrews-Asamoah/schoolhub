@@ -44,6 +44,8 @@ model user {
 
   // Relations
   accounts             account[]
+  syncDevices          SyncDevice[] @relation("SyncDeviceOwner")
+  revokedSyncDevices   SyncDevice[] @relation("SyncDeviceRevoker")
   sessions             session[]
   twoFactors           twoFactor[]
   invitations          invitation[]
@@ -120,6 +122,10 @@ model session {
   activeOrganizationId String?
   // Required by impersonation (admin plugin)
   impersonatedBy       String?
+  // Server-owned origin channel; never writable by auth request bodies.
+  clientPlatform       String   @default("web")
+  desktopDeviceId      String?
+  desktopDevice        SyncDevice? @relation(fields: [desktopDeviceId], references: [id], onDelete: Cascade)
 
   user user @relation(fields: [userId], references: [id], onDelete: Cascade)
   pushDevices DeviceToken[]
@@ -128,6 +134,7 @@ model session {
   @@index([userId])
   @@index([activeOrganizationId])
   @@index([impersonatedBy])
+  @@index([desktopDeviceId])
   @@map("sessions")
 }
 

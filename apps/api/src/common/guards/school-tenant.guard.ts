@@ -1,3 +1,4 @@
+import { assertDesktopSchoolRole, assertDesktopVersion, desktopEntitled, isDesktopRequest, DESKTOP_ACCESS_DISABLED } from "../desktop-policy.js";
 import {
   Injectable,
   Logger,
@@ -78,6 +79,8 @@ export class SchoolTenantGuard implements CanActivate {
     }
 
     const user = session.user;
+    assertDesktopSchoolRole(request, user.role);
+    assertDesktopVersion(request);
     if (user.banned === true) {
       throw new ForbiddenException("This account has been suspended.");
     }
@@ -208,6 +211,17 @@ export class SchoolTenantGuard implements CanActivate {
           error: SUBSCRIPTION_INACTIVE,
           reason: access.reason,
         });
+      }
+    }
+
+    if (isDesktopRequest(request)) {
+      const subscription = await this.prisma.client.subscription.findUnique({
+        where: { schoolId: school.id },
+        select: { settings: true, plan: { select: { features: true } } },
+      });
+      if (!subscription || !desktopEntitled(subscription.plan?.features, subscription.settings)) {
+        throw new ForbiddenException({ error: DESKTOP_ACCESS_DISABLED,
+          message: "Desktop access is not enabled for this school. Contact your school administrator." });
       }
     }
 

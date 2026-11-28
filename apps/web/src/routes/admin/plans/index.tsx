@@ -1,3 +1,4 @@
+import { DESKTOP_PLAN_FEATURE } from "@schoolhub/shared";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -48,7 +49,7 @@ function SubscriptionPlansPage() {
           <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Included capacity</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><Limit label="Students" value={limitLabel(plan.maxStudents)} /><Limit label="Teachers" value={limitLabel(plan.maxTeachers)} /><Limit label="Guardians" value={limitLabel(plan.maxGuardians)} /><Limit label="Other staff" value={limitLabel(plan.maxStaff)} /></div>
         </div>
-        <div className="border-t border-border bg-muted/20 px-5 py-4"><p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Feature entitlements</p><div className="flex flex-wrap gap-1.5">{(Array.isArray(plan.features) ? plan.features : []).length ? (plan.features as string[]).map(feature => <span key={feature} className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground"><Check className="size-3 text-success" />{feature}</span>) : <span className="text-xs text-muted-foreground">No feature list defined</span>}</div><p className="mt-3 text-[11px] text-muted-foreground">Plan version {plan.version} · Changes apply to future assignments; existing subscriptions need an explicit upgrade/downgrade.</p></div>
+        <div className="border-t border-border bg-muted/20 px-5 py-4"><p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Feature entitlements</p><div className="flex flex-wrap gap-1.5">{(Array.isArray(plan.features) ? plan.features : []).length ? (plan.features as string[]).map(feature => <span key={feature} className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground"><Check className="size-3 text-success" />{feature === DESKTOP_PLAN_FEATURE ? "Desktop app" : feature}</span>) : <span className="text-xs text-muted-foreground">No feature list defined</span>}</div><p className="mt-3 text-[11px] text-muted-foreground">Plan version {plan.version} · Price and capacity changes require reassignment. Desktop access changes apply to assigned schools immediately.</p></div>
       </article>)}</div>}
     {editing && <SubscriptionPlanEditor plan={editing === "new" ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setNotice(editing === "new" ? "Subscription plan created." : "Subscription plan updated."); setEditing(null); }} />}
 

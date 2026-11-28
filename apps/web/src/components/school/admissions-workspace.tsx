@@ -2,8 +2,9 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil } from "lucide-react";
+import { Copy, Pencil } from "lucide-react";
 import { useState } from "react";
+import { toast } from "@/components/ui/toaster";
 import {
   formatPersonName,
   saveAdmissionCycleSchema,
@@ -15,6 +16,7 @@ import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { WorkspaceEmptyState } from "@/components/school/workspace-ui";
 import { apiFetch, errorText } from "@/lib/api";
 import { getTenantSubdomain, useTenantSchool } from "@/lib/tenant";
+import { platform } from "@schoolhub/platform";
 
 interface ClassOption {
   id: string;
@@ -134,6 +136,9 @@ export function AdmissionsWorkspace() {
   const { activeRole } = useSchoolRole();
   const canDecide = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
   const subdomain = getTenantSubdomain();
+  const publicFormUrl = subdomain ? (platform.target === "desktop"
+    ? `https://${subdomain}.${import.meta.env.VITE_SCHOOLHUB_WEB_DOMAIN || "schoolhub.gh"}/apply`
+    : new URL(`/apply${window.location.search}`, window.location.origin).href) : null;
   const cyclesQuery = useQuery({
     queryKey: ["admissions", "cycles"],
     queryFn: () => apiFetch<Cycle[]>("/admissions/cycles"),
@@ -155,14 +160,30 @@ export function AdmissionsWorkspace() {
             </button>
           ))}
         </div>
-        {subdomain && (
-          <p className="text-xs text-muted-foreground">
-            Public enrollment form:{" "}
-            <a className="font-semibold text-primary underline" href={`/apply${window.location.search}`} target="_blank" rel="noreferrer">
-              {window.location.origin}/apply
-            </a>
-          </p>
-        )}
+        {publicFormUrl && (platform.target === "desktop" ? (
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="grid gap-1 text-xs text-muted-foreground">
+              Public enrollment form
+              <input readOnly value={publicFormUrl} onFocus={(event) => event.target.select()}
+                className="w-64 max-w-full rounded-md border border-input bg-background px-2 py-1.5 text-foreground" />
+            </label>
+            <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs font-semibold"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(publicFormUrl);
+                  toast.success("Application link copied.");
+                } catch {
+                  toast.error("Could not copy automatically. Select the link to copy it manually.");
+                }
+              }}>
+              <Copy className="size-3.5" /> Copy link
+            </button>
+          </div>
+        ) : (
+          <a className="text-xs font-semibold text-primary underline" href={publicFormUrl} target="_blank" rel="noreferrer">
+            Open public enrollment form
+          </a>
+        ))}
       </div>
       {cyclesQuery.error ? (
         <WorkspaceEmptyState title="Could not load admissions" description={errorText(cyclesQuery.error)} />

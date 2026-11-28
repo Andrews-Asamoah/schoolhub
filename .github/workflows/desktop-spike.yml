@@ -1,0 +1,137 @@
+name: Desktop feasibility spike
+
+on:
+  pull_request:
+    branches: [dev, desktop-version]
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/web/**'
+      - 'apps/api/**'
+      - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/desktop-spike.yml'
+  push:
+    branches: [desktop-version]
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/web/**'
+      - 'apps/api/**'
+      - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/desktop-spike.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  protocol:
+    name: Synthetic outbox crash and retry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: schoolhub_desktop_spike
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: node apps/desktop/spike/check-config.mjs
+      - run: node apps/desktop/spike/check-boundaries.mjs
+      - run: node --test apps/desktop/spike/*.test.mjs
+      - name: Prove serialized cursor commit and rollback ordering
+        env:
+          DESKTOP_SPIKE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_desktop_spike
+        run: python3 apps/desktop/spike/cursor-postgres.py
+
+  windows:
+    name: Windows SQLCipher and Tauri shell
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install web build dependencies
+        run: pnpm install --frozen-lockfile --filter @schoolhub/web...
+      - name: Build shared package and existing web UI
+        run: |
+          pnpm --filter @schoolhub/shared build
+          pnpm --filter @schoolhub/web build
+          pnpm --filter @schoolhub/web test
+          pnpm --filter @schoolhub/web build:desktop
+      - name: Test SQLCipher, devices, sessions and Windows Credential Manager
+        working-directory: apps/desktop/src-tauri
+        run: cargo test --locked --lib
+      - name: Build the native shell with the actual web assets
+        env:
+          SCHOOLHUB_API_ORIGIN: https://api.schoolhub.invalid
+        working-directory: apps/desktop/src-tauri
+        run: cargo build --locked --release --features shell,custom-protocol
+      - name: Report executable size (not installer size)
+        shell: pwsh
+        run: |
+          $binary = Get-Item apps/desktop/src-tauri/target/release/schoolhub-desktop-spike.exe
+          "Native executable bytes: $($binary.Length)" >> $env:GITHUB_STEP_SUMMARY
+          "Unsigned feasibility binary only; installer, startup, RAM and runtime validation remain pending." >> $env:GITHUB_STEP_SUMMARY
+
+  server:
+    name: Desktop API policy, devices and real authentication
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: schoolhub_desktop_api
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_desktop_api
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_desktop_api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @schoolhub/api typecheck
+      - run: pnpm --filter @schoolhub/api exec prisma migrate deploy --config prisma.config.ts
+      - run: pnpm --filter @schoolhub/api test
+      - run: pnpm --filter @schoolhub/api exec vitest run --config vitest.config.e2e.ts test/desktop-access.e2e-spec.ts
+      - run: node apps/api/scripts/route-inventory.mjs --check
