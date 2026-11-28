@@ -206,14 +206,14 @@ export function ExternalExaminationsWorkspace(){
           </div>
           <div className="overflow-x-auto rounded-lg border border-border">
             <Table scroll={false} className="w-full min-w-[650px] text-xs">
-              <TableHeader className="bg-muted text-left"><TableRow><TableHead className="p-3">Subject</TableHead>
-                <TableHead className="p-3">Recorded</TableHead><TableHead className="p-3">Pending</TableHead>
-                <TableHead className="p-3">Grades 1–9 (counts)</TableHead><TableHead className="p-3">Other statuses</TableHead></TableRow></TableHeader>
+              <TableHeader className="bg-muted text-left"><TableRow><TableHead>Subject</TableHead>
+                <TableHead>Recorded</TableHead><TableHead>Pending</TableHead>
+                <TableHead>Grades 1–9 (counts)</TableHead><TableHead>Other statuses</TableHead></TableRow></TableHeader>
               <TableBody>{summary.data.papers.map(p=><TableRow key={p.id} className="border-t border-border">
-                <TableCell className="p-3 font-semibold">{p.code} · {p.name}</TableCell>
-                <TableCell className="p-3">{p.recorded}/{p.expected}</TableCell><TableCell className="p-3">{p.pending}</TableCell>
-                <TableCell className="p-3">{p.grades.map(g=>g.grade+":"+g.count).join(" · ")}</TableCell>
-                <TableCell className="p-3">Absent {p.statuses.ABSENT} · Withheld {p.statuses.WITHHELD}
+                <TableCell className="font-semibold">{p.code} · {p.name}</TableCell>
+                <TableCell>{p.recorded}/{p.expected}</TableCell><TableCell>{p.pending}</TableCell>
+                <TableCell>{p.grades.map(g=>g.grade+":"+g.count).join(" · ")}</TableCell>
+                <TableCell>Absent {p.statuses.ABSENT} · Withheld {p.statuses.WITHHELD}
                   {" · "}Cancelled {p.statuses.CANCELLED}</TableCell>
               </TableRow>)}</TableBody>
             </Table>
@@ -234,15 +234,15 @@ export function ExternalExaminationsWorkspace(){
           </p>
           <div className="max-h-[620px] overflow-auto rounded-lg border border-border">
             <Table scroll={false} className="w-full min-w-[760px] text-left text-xs">
-              <TableHeader className="sticky top-0 bg-muted"><TableRow><TableHead className="p-3">Candidate</TableHead>
-                <TableHead className="p-3">WAEC index number</TableHead><TableHead className="p-3">Result status</TableHead>
-                <TableHead className="p-3">Grade</TableHead><TableHead className="p-3">Saved record</TableHead></TableRow></TableHeader>
+              <TableHeader className="sticky top-0 bg-muted"><TableRow><TableHead>Candidate</TableHead>
+                <TableHead>WAEC index number</TableHead><TableHead>Result status</TableHead>
+                <TableHead>Grade</TableHead><TableHead>Saved record</TableHead></TableRow></TableHeader>
               <TableBody>{candidates.map(c=>{
                 const draft=drafts[c.id]??{status:"UNRECORDED",grade:"",indexNumber:c.indexNumber??""};
                 return <TableRow key={c.id} className="border-t border-border align-top">
-                  <TableCell className="p-3"><strong>{c.name}</strong>
+                  <TableCell><strong>{c.name}</strong>
                     <span className="block text-muted-foreground">{c.admissionNumber??"—"}</span></TableCell>
-                  <TableCell className="p-3">
+                  <TableCell>
                     <div className="flex items-center gap-1">
                       <input aria-label={"Index number for "+c.name} className={field+" min-w-36"}
                         maxLength={60} value={draft.indexNumber}
@@ -255,7 +255,7 @@ export function ExternalExaminationsWorkspace(){
                             expectedVersion:c.indexVersion})}>Save</button>}
                     </div>
                   </TableCell>
-                  <TableCell className="p-3">
+                  <TableCell>
                     <Select value={draft.status} disabled={!sheet.data!.canEdit}
                       onValueChange={v=>setDrafts(p=>({...p,[c.id]:{...draft,status:v as Draft["status"],grade:v==="GRADED"?draft.grade:""}}))}>
                       <SelectTrigger aria-label={"Result status for "+c.name}><SelectValue/></SelectTrigger>
@@ -266,12 +266,12 @@ export function ExternalExaminationsWorkspace(){
                         <SelectItem value="CANCELLED">Cancelled</SelectItem></SelectContent>
                     </Select>
                   </TableCell>
-                  <TableCell className="p-3">
+                  <TableCell>
                     <input aria-label={"BECE grade for "+c.name} type="number" min="1" max="9" step="1"
                       className={field+" w-24"} disabled={!sheet.data!.canEdit||draft.status!=="GRADED"}
                       value={draft.grade} onChange={e=>setDrafts(p=>({...p,[c.id]:{...draft,grade:e.target.value}}))}/>
                   </TableCell>
-                  <TableCell className="p-3">{c.status??"Unrecorded"}{c.grade!==null?" · "+c.grade:""}
+                  <TableCell>{c.status??"Unrecorded"}{c.grade!==null?" · "+c.grade:""}
                     <span className="block text-muted-foreground">v{c.version}</span></TableCell>
                 </TableRow>;
               })}</TableBody>

@@ -7,6 +7,7 @@ import { Check, ChevronsUpDown, LoaderCircle, School, X } from "lucide-react";
 import { formatPersonName, type RecordPaymentInput } from "@schoolhub/shared";
 import { cn } from "@/lib/utils";
 
+import { formatGhs as money } from "@/lib/format";
 interface PaymentStudent {
   id: string;
   admissionNumber: string;
@@ -73,13 +74,6 @@ const today = () => {
     .slice(0, 10);
 };
 const amount = (value: number | string) => Number(value) || 0;
-const money = (value: number) =>
-  new Intl.NumberFormat("en-GH", {
-    style: "currency",
-    currency: "GHS",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
 const studentName = (student?: PaymentStudent | null) =>
   formatPersonName(student?.profile) || student?.admissionNumber || "Unknown student";
 const outstanding = (bill: PaymentBill) =>

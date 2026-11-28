@@ -5,6 +5,8 @@
  *  1. No native confirm( / alert( / prompt(  -> use confirmAction() from components/ui/confirm-host
  *     or toast from components/ui/toaster.
  *  2. Use the shared Table primitives or DataTable for application tables.
+ *  3. Table cells never set their own padding. Density comes from <Table> (use `dense` for previews),
+ *     so every table in the app lines up. Print documents and fixed grids are listed below.
  *
  * A line can opt out with a trailing  // ui-allow: <reason>  comment.
  */
@@ -20,6 +22,14 @@ const TABLE_ALLOW = new Set([
   "components/ui/table.tsx",
   "lib/table-export.ts", // builds print-only HTML
 ]);
+
+/** Print documents and fixed grids that need their own cell spacing. */
+const CELL_PADDING_ALLOW = new Set([
+  "components/reports/report-card-document.tsx",
+  "routes/verify-report.$id.$code.tsx",
+  "components/school/timetable-workspace.tsx",
+]);
+const CELL_PADDING = /<Table(?:Head|Cell)\b[^>]*className=(?:"[^"]*|\{[^}]*)(?<![\w:\[-])(?:p|px|py|pt|pb|pl|pr)-(?:\[[^\]]+\]|[\d.]+)(?![\w\]-])/;
 
 const NATIVE_DIALOG = /(?<![\w.$])(?:window\.)?(?:confirm|alert|prompt)\(/;
 const RAW_TABLE = /<table[\s>]/;
@@ -41,6 +51,9 @@ for (const file of walk(SRC)) {
     const code = line.replace(/^\s*(\/\/|\*|\/\*).*$/, ""); // ignore comment-only lines
     if (NATIVE_DIALOG.test(code)) {
       failures.push(`${rel}:${index + 1}  native dialog. Use confirmAction() or toast.`);
+    }
+    if (CELL_PADDING.test(code) && !CELL_PADDING_ALLOW.has(rel)) {
+      failures.push(`${rel}:${index + 1}  table cell sets its own padding. Remove it, or use <Table dense>.`);
     }
     if (RAW_TABLE.test(code) && !TABLE_ALLOW.has(rel)) {
       failures.push(`${rel}:${index + 1}  hand-written <table>. Use Table or DataTable.`);

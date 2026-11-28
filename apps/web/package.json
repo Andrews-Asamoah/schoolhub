@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint:theme": "node scripts/check-theme.mjs && node scripts/check-ui.mjs",
-    "audit:theme": "node scripts/audit-theme-contrast.mjs"
+    "audit:theme": "node scripts/audit-theme-contrast.mjs",
+    "check:bundle": "node scripts/check-bundle.mjs"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.4.1",

@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { BulkImportDialog } from "@/components/bulk-import/bulk-import-dialog";
 import { FileDropzone } from "@/components/bulk-import/file-dropzone";
 import { Button } from "@/components/ui/button";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, retryOnRateLimit } from "@/lib/api";
 import { confirmAction } from "@/components/ui/confirm-host";
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
@@ -83,9 +83,8 @@ export function StudentPhotoBulkUpload({
         setProgress(`Uploading ${Math.min(offset + batch.length, files.length)} of ${files.length} photos…`);
         const formData = new FormData();
         batch.forEach((file) => formData.append("photos", file));
-        const response = await apiFetch<{ results: PhotoUploadResult[] }>(
-          "/schools/current/photos/students/bulk",
-          { method: "POST", body: formData },
+        const response = await retryOnRateLimit(() =>
+          apiFetch<{ results: PhotoUploadResult[] }>("/schools/current/photos/students/bulk", { method: "POST", body: formData }),
         );
         collected.push(...response.results);
         setResults([...collected]);
@@ -163,9 +162,9 @@ export function StudentPhotoBulkUpload({
           <div className="space-y-2">
             <p className="text-sm font-semibold text-foreground">{uploaded} uploaded · {failed} failed</p>
             <div className="max-h-60 overflow-auto rounded-xl border border-border">
-              <Table scroll={false} className="w-full text-left text-xs">
-                <TableHeader className="sticky top-0 bg-muted text-muted-foreground"><TableRow><TableHead className="p-2">File</TableHead><TableHead className="p-2">Student ID</TableHead><TableHead className="p-2">Result</TableHead><TableHead className="p-2">Details</TableHead></TableRow></TableHeader>
-                <TableBody>{results.map((result, index) => <TableRow key={`${result.fileName}:${index}`} className="border-t border-border"><TableCell className="max-w-40 truncate p-2">{result.fileName}</TableCell><TableCell className="p-2">{result.studentId ?? result.identifier}</TableCell><TableCell className="p-2">{result.status === "uploaded" ? <span className="inline-flex items-center gap-1 text-success"><Check className="size-3" />Uploaded</span> : <span className="text-destructive">Failed</span>}</TableCell><TableCell className="p-2 text-muted-foreground">{result.message ?? ""}</TableCell></TableRow>)}</TableBody>
+              <Table dense scroll={false} className="w-full text-left text-xs">
+                <TableHeader className="sticky top-0 bg-muted text-muted-foreground"><TableRow><TableHead>File</TableHead><TableHead>Student ID</TableHead><TableHead>Result</TableHead><TableHead>Details</TableHead></TableRow></TableHeader>
+                <TableBody>{results.map((result, index) => <TableRow key={`${result.fileName}:${index}`} className="border-t border-border"><TableCell className="max-w-40 truncate">{result.fileName}</TableCell><TableCell>{result.studentId ?? result.identifier}</TableCell><TableCell>{result.status === "uploaded" ? <span className="inline-flex items-center gap-1 text-success"><Check className="size-3" />Uploaded</span> : <span className="text-destructive">Failed</span>}</TableCell><TableCell className="text-muted-foreground">{result.message ?? ""}</TableCell></TableRow>)}</TableBody>
               </Table>
             </div>
           </div>

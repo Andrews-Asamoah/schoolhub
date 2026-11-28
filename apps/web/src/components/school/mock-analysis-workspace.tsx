@@ -5,6 +5,7 @@ import { ArrowDownRight, ArrowRight, ArrowUpRight, BarChart3, TriangleAlert } fr
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { apiFetch } from "@/lib/api";
 
+import { cn } from "@/lib/utils";
 type Status = "ON_TRACK" | "WATCH" | "AT_RISK";
 type Trend = "IMPROVING" | "STEADY" | "DECLINING" | "NEW";
 interface Options { years: { id: string; name: string; isCurrent: boolean }[]; classes: { id: string; name: string; academicYearId: string | null; yearIds: string[] }[] }
@@ -198,11 +199,11 @@ export function MockAnalysisWorkspace() {
           <Panel title="Subjects across mocks" note="Average percentage per subject. Arrows compare with the previous mock the subject was written.">
             <div className="overflow-x-auto">
               <Table scroll={false} className="w-full text-sm">
-                <TableHeader><TableRow className="border-b border-border text-left text-xs text-muted-foreground"><TableHead className="py-2 pr-4">Subject</TableHead>{data.mocks.map((m) => <TableHead key={m.id} className="py-2 pr-4">{m.name}</TableHead>)}</TableRow></TableHeader>
+                <TableHeader><TableRow className="border-b border-border text-left text-xs text-muted-foreground"><TableHead>Subject</TableHead>{data.mocks.map((m) => <TableHead key={m.id}>{m.name}</TableHead>)}</TableRow></TableHeader>
                 <TableBody>{data.subjects.map((subject) => (
                   <TableRow key={subject.subjectId} className="border-b border-border/60">
-                    <TableCell className="py-2 pr-4 font-medium">{subject.name}</TableCell>
-                    {subject.points.map((p) => <TableCell key={p.mockId} className="py-2 pr-4 tabular-nums">{fmt(p.average)}<Delta value={p.delta} /></TableCell>)}
+                    <TableCell className="font-medium">{subject.name}</TableCell>
+                    {subject.points.map((p) => <TableCell key={p.mockId} className="tabular-nums">{fmt(p.average)}<Delta value={p.delta} /></TableCell>)}
                   </TableRow>
                 ))}</TableBody>
               </Table>
@@ -213,14 +214,14 @@ export function MockAnalysisWorkspace() {
             <div className="overflow-x-auto">
               <Table scroll={false} className="w-full text-sm">
                 <TableHeader><TableRow className="border-b border-border text-left text-xs text-muted-foreground">
-                  <TableHead className="py-2 pr-4">Pupil</TableHead>{data.mocks.map((m) => <TableHead key={m.id} className="py-2 pr-4">{m.name}</TableHead>)}<TableHead className="py-2 pr-4">Trend</TableHead><TableHead className="py-2">Status</TableHead>
+                  <TableHead>Pupil</TableHead>{data.mocks.map((m) => <TableHead key={m.id}>{m.name}</TableHead>)}<TableHead>Trend</TableHead><TableHead>Status</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>{students.map((student) => (
                   <TableRow key={student.id} onClick={() => setStudentId(student.id === studentId ? null : student.id)} className={`cursor-pointer border-b border-border/60 hover:bg-muted/40 ${student.id === studentId ? "bg-muted/50" : ""}`}>
-                    <TableCell className="py-2 pr-4 font-medium">{student.name}</TableCell>
-                    {student.series.map((p) => <TableCell key={p.mockId} className="py-2 pr-4 tabular-nums">{fmt(p.average)}{p.position != null && <span className="ml-1 text-[11px] text-muted-foreground">#{p.position}</span>}</TableCell>)}
-                    <TableCell className="py-2 pr-4">{student.mocksSat ? <TrendBadge trend={student.trend} change={student.change} /> : <span className="text-xs text-muted-foreground">Not sat</span>}</TableCell>
-                    <TableCell className="py-2">{student.status ? <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[student.status]}`}>{STATUS_LABEL[student.status]}</span> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                    <TableCell className="font-medium">{student.name}</TableCell>
+                    {student.series.map((p) => <TableCell key={p.mockId} className="tabular-nums">{fmt(p.average)}{p.position != null && <span className="ml-1 text-[11px] text-muted-foreground">#{p.position}</span>}</TableCell>)}
+                    <TableCell>{student.mocksSat ? <TrendBadge trend={student.trend} change={student.change} /> : <span className="text-xs text-muted-foreground">Not sat</span>}</TableCell>
+                    <TableCell>{student.status ? <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[student.status]}`}>{STATUS_LABEL[student.status]}</span> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                   </TableRow>
                 ))}</TableBody>
               </Table>
@@ -257,15 +258,15 @@ function StudentDetail({ student, data }: { student: StudentRow; data: Analysis 
         </div>
         <div className="overflow-x-auto">
           <Table scroll={false} className="w-full text-sm">
-            <TableHeader><TableRow className="border-b border-border text-left text-xs text-muted-foreground"><TableHead className="py-2 pr-3">Subject</TableHead>{data.mocks.map((m) => <TableHead key={m.id} className="py-2 pr-3">{m.name}</TableHead>)}</TableRow></TableHeader>
+            <TableHeader><TableRow className="border-b border-border text-left text-xs text-muted-foreground"><TableHead>Subject</TableHead>{data.mocks.map((m) => <TableHead key={m.id}>{m.name}</TableHead>)}</TableRow></TableHeader>
             <TableBody>{data.subjects.map((subject) => (
               <TableRow key={subject.subjectId} className="border-b border-border/60">
-                <TableCell className="py-1.5 pr-3">{subject.name}</TableCell>
+                <TableCell>{subject.name}</TableCell>
                 {student.series.map((p) => {
                   const row = p.subjects.find((s) => s.subjectId === subject.subjectId);
                   const avg = subject.points.find((pt) => pt.mockId === p.mockId)?.average ?? null;
                   const below = row && avg != null && row.percentage < avg;
-                  return <TableCell key={p.mockId} className={`py-1.5 pr-3 tabular-nums ${below ? "text-destructive" : ""}`}>{row ? `${row.percentage.toFixed(1)}${row.grade ? ` (${row.grade})` : ""}` : "—"}</TableCell>;
+                  return <TableCell key={p.mockId} className={cn("tabular-nums", below && "text-destructive")}>{row ? `${row.percentage.toFixed(1)}${row.grade ? ` (${row.grade})` : ""}` : "—"}</TableCell>;
                 })}
               </TableRow>
             ))}</TableBody>

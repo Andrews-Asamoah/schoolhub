@@ -23,6 +23,8 @@ import { AuditActorParam } from "../../common/audit/audit-actor.decorator.js";
 import type { AuditActor } from "../../common/audit/audit.js";
 import { AssetsService } from "./assets.service.js";
 import { MAX_IMAGE_BYTES } from "./image-validation.js";
+import { Throttle } from "@nestjs/throttler";
+import { BULK_THROTTLE } from "../../common/bulk-throttle.js";
 
 const imageUpload = (field: string) =>
   FileInterceptor(field, { limits: { fileSize: MAX_IMAGE_BYTES, files: 1 } });
@@ -94,6 +96,7 @@ export class AssetsController {
   }
 
   @Post("photos/students/bulk")
+  @Throttle(BULK_THROTTLE)
   @Roles("owner", "admin", "headteacher")
   @Header("Cache-Control", "no-store")
   @UseInterceptors(FilesInterceptor("photos", 25, { limits: { fileSize: MAX_IMAGE_BYTES, files: 25 } }))

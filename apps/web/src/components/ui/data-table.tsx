@@ -42,10 +42,14 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ErrorState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { errorText } from "@/lib/api";
 import {
   exportPdf,
   exportXlsx,
@@ -81,7 +85,11 @@ export interface DataTableColumn<T> {
   exportable?: boolean;
   /** Allow sorting by this column. Defaults to true except for action columns. */
   sortable?: boolean;
+  /** Cell alignment. Right-aligned columns also use tabular figures so money and marks line up. */
+  align?: "left" | "center" | "right";
 }
+
+const ALIGN_CLASS = { left: "", center: "text-center", right: "text-right tabular-nums" } as const;
 
 const isActionColumn = (column: { header: string }) => !column.header.trim() || /^actions?$/i.test(column.header.trim());
 
@@ -113,6 +121,13 @@ export interface DataTableProps<T extends RowData> {
   embedded?: boolean;
   /** Client-side paging. Turn off when the page already pages on the server. */
   paginate?: boolean;
+  /** Placeholder rows while the first load is in flight. */
+  isLoading?: boolean;
+  /** A failed load: shows a retry banner instead of an empty table. */
+  error?: unknown;
+  onRetry?: () => void;
+  /** Totals or summary rows (<TableRow> elements) shown in the table footer. */
+  footer?: ReactNode;
 }
 
 export function DataTable<T extends RowData>({
@@ -129,6 +144,10 @@ export function DataTable<T extends RowData>({
   searchable = true,
   embedded = false,
   paginate = true,
+  isLoading = false,
+  error,
+  onRetry,
+  footer,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -149,7 +168,7 @@ export function DataTable<T extends RowData>({
       enableSorting: column.sortable ?? !isActionColumn(column),
       enableGlobalFilter: !isActionColumn(column) || column.value !== undefined,
       sortFn: (a, b, id) => compareValues(a.getValue(id), b.getValue(id)),
-      meta: { className: column.className, exportable: column.exportable ?? !isActionColumn(column) },
+      meta: { className: cn(ALIGN_CLASS[column.align ?? "left"], column.className), exportable: column.exportable ?? !isActionColumn(column) },
     }));
     if (!canExport) return data;
     return [
@@ -212,6 +231,8 @@ export function DataTable<T extends RowData>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows]);
 
+  if (error) return <ErrorState message={errorText(error)} onRetry={onRetry} />;
+  if (isLoading) return <DataTableSkeleton columns={columns.length} />;
   if (rows.length === 0) return <DataTableEmpty title={emptyTitle} description={emptyDescription} />;
 
   const filteredCount = table.getPrePaginatedRowModel().rows.length;
@@ -302,7 +323,7 @@ export function DataTable<T extends RowData>({
                     key={header.id}
                     scope="col"
                     aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : undefined}
-                    className={cn("px-5", meta?.className)}
+                    className={meta?.className}
                   >
                     {header.isPlaceholder ? null : header.column.getCanSort() ? (
                       <button
@@ -329,7 +350,7 @@ export function DataTable<T extends RowData>({
                 {row.getVisibleCells().map((cell) => {
                   const meta = cell.column.columnDef.meta as { className?: string } | undefined;
                   return (
-                    <TableCell key={cell.id} className={cn("px-5 py-3.5", meta?.className)}>
+                    <TableCell key={cell.id} className={meta?.className}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   );
@@ -344,6 +365,7 @@ export function DataTable<T extends RowData>({
             </TableRow>
           )}
         </TableBody>
+        {footer && <TableFooter>{footer}</TableFooter>}
       </Table>
 
       {!compact && paginate && (
@@ -417,6 +439,19 @@ export function TableExportMenu({ build, note, officialPdf, onPrint, triggerClas
         {note && <p className="border-t border-border px-2 pb-1 pt-2 text-[10px] text-muted-foreground">{note}</p>}
       </Menu>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+export function DataTableSkeleton({ columns, rows = 5 }: { columns: number; rows?: number }) {
+  const cols = Math.max(1, columns);
+  return (
+    <div role="status" aria-label="Loading table" className="space-y-3 rounded-2xl border border-border bg-card p-4">
+      {Array.from({ length: rows }, (_, row) => (
+        <div key={row} className="grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+          {Array.from({ length: cols }, (_, col) => <Skeleton key={col} className="h-5" />)}
+        </div>
+      ))}
     </div>
   );
 }

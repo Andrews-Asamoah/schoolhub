@@ -1,5 +1,4 @@
 import { Check, CircleAlert, Copy, Download, KeyRound, LoaderCircle, ShieldCheck, ShieldOff, Smartphone } from "lucide-react";
-import QRCode from "qrcode";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { authClient, useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
@@ -108,9 +107,11 @@ export function TwoFactorPanel({ required = false, onEnabled }: TwoFactorPanelPr
   useEffect(() => {
     if (!totpURI) return setQr("");
     let cancelled = false;
-    void QRCode.toDataURL(totpURI, { width: 220, margin: 1, errorCorrectionLevel: "M" }).then((url) => {
-      if (!cancelled) setQr(url);
-    });
+    void import("qrcode")
+      .then(({ default: QRCode }) => QRCode.toDataURL(totpURI, { width: 220, margin: 1, errorCorrectionLevel: "M" }))
+      .then((url) => {
+        if (!cancelled) setQr(url);
+      });
     return () => { cancelled = true; };
   }, [totpURI]);
 

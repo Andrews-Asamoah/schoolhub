@@ -160,15 +160,15 @@ export function AttendanceReviewWorkspace({ classId, canManage }: {
       </p> : <div className="space-y-2">
         <h4 className="text-xs font-bold">Unmarked register days</h4>
         <div className="max-h-64 overflow-y-auto rounded-xl border border-border">
-          <Table scroll={false} className="w-full text-left text-xs">
+          <Table dense scroll={false} className="w-full text-left text-xs">
             <TableHeader className="sticky top-0 bg-muted">
-              <TableRow><TableHead className="p-2">Date</TableHead><TableHead className="p-2">Recorded / expected</TableHead><TableHead className="p-2">Missing</TableHead><TableHead className="p-2">Action</TableHead></TableRow>
+              <TableRow><TableHead>Date</TableHead><TableHead>Recorded / expected</TableHead><TableHead>Missing</TableHead><TableHead>Action</TableHead></TableRow>
             </TableHeader>
             <TableBody>{gaps.days.map(day => <TableRow key={day.date} className="border-t border-border">
-              <TableCell className="p-2">{day.date}{day.historical && <span className="ml-1 text-muted-foreground">(historical)</span>}</TableCell>
-              <TableCell className="p-2">{day.marked} / {day.expected}</TableCell>
-              <TableCell className="p-2 font-semibold">{day.missing}</TableCell>
-              <TableCell className="p-2">
+              <TableCell>{day.date}{day.historical && <span className="ml-1 text-muted-foreground">(historical)</span>}</TableCell>
+              <TableCell>{day.marked} / {day.expected}</TableCell>
+              <TableCell className="font-semibold">{day.missing}</TableCell>
+              <TableCell>
                 {canManage
                   ? <button type="button" className="text-primary underline" onClick={() => {
                     setDateSelection(day.date); setStudentId("");

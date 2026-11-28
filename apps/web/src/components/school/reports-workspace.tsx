@@ -5,8 +5,8 @@ import { DashboardInfographics } from "@/components/school/dashboard/dashboard-i
 import type { DashboardAnalytics } from "@/components/school/dashboard/dashboard-data";
 import { apiFetch } from "@/lib/api";
 
+import { ghsFormat as moneyFormat } from "@/lib/format";
 const numberFormat = new Intl.NumberFormat("en-GH");
-const moneyFormat = new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 });
 
 export function SchoolReportsWorkspace() {
   const [months, setMonths] = useState(6);

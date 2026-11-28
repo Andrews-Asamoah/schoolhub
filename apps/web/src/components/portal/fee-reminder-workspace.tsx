@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
 import { LabeledField } from "@/components/forms/labeled-controls";
 
+import { formatGhs as money } from "@/lib/format";
 interface Installment {
   id: string;
   label: string;
@@ -59,7 +60,6 @@ interface ScheduleDraft {
   dueDate: string;
   sendDate: string;
 }
-const money = (value: number | string) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0);
 const dateLabel = (value?: string | null) => {
   if (!value) return "Not set";
   const date = new Date(value.length === 10 ? value + "T00:00:00.000Z" : value);

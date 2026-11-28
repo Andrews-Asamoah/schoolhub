@@ -141,6 +141,8 @@ jobs:
           pnpm --filter @schoolhub/mobile typecheck
       - name: Web build
         run: pnpm --filter @schoolhub/web build
+      - name: Web first-load bundle budget
+        run: pnpm --filter @schoolhub/web check:bundle
       - name: Check controller route inventory
         run: node apps/api/scripts/route-inventory.mjs --check
       - name: Validate release manifest contracts

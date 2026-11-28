@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
 import { LabeledField } from "@/components/forms/labeled-controls";
 
+import { formatGhs as currency } from "@/lib/format";
 interface ExpenseCategory {
   id: string;
   name: string;
@@ -48,7 +49,6 @@ interface ExpenseDraft {
 }
 const accountingGroups = ["SALARY", "UTILITIES", "SUPPLIES", "MAINTENANCE", "TRANSPORT", "RENT", "INSURANCE", "TAXES", "OTHER"];
 const paymentMethods = ["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"];
-const currency = (value: number) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 const dateValue = (date: Date) => {
   const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return shifted.toISOString().slice(0, 10);

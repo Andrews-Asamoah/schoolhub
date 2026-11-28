@@ -25,9 +25,32 @@ export class ApiError extends Error {
     public readonly status: number,
     message: string,
     public readonly body: unknown,
+    /** Set on HTTP 429 from the Retry-After header. */
+    public readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = "ApiError";
+  }
+}
+
+const retryAfterOf = (response: Response) => {
+  const seconds = Number(response.headers.get("retry-after"));
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined;
+};
+
+/**
+ * Runs a request and, if the server answers 429, waits (Retry-After, else a short backoff) and tries
+ * again. Bulk loops use it so a rate limit slows them down instead of stopping them part-way.
+ * A 429 is returned before the handler runs, so retrying never repeats work.
+ */
+export async function retryOnRateLimit<T>(task: () => Promise<T>, attempts = 4): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await task();
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 429 || attempt >= attempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, Math.min(error.retryAfterMs ?? 2_000 * attempt, 30_000)));
+    }
   }
 }
 
@@ -129,6 +152,7 @@ export async function apiFetch<T>(
       res.status,
       (body as { message?: string }).message ?? res.statusText,
       body,
+      retryAfterOf(res),
     );
   }
 

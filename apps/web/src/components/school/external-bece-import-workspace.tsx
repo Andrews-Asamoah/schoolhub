@@ -91,18 +91,18 @@ export function ExternalBeceImportWorkspace({sessionId,paperId,status}:{
           Workbook SHA-256: {preview.sha256}
         </p>
         <div className="max-h-80 overflow-auto rounded-lg border border-border">
-          <Table scroll={false} className="w-full min-w-[630px] text-left text-xs">
+          <Table dense scroll={false} className="w-full min-w-[630px] text-left text-xs">
             <TableHeader className="sticky top-0 bg-muted"><TableRow>
-              <TableHead className="p-2">Excel row</TableHead><TableHead className="p-2">Candidate / index</TableHead>
-              <TableHead className="p-2">Subject</TableHead><TableHead className="p-2">Proposed</TableHead>
-              <TableHead className="p-2">Decision / issues</TableHead>
+              <TableHead>Excel row</TableHead><TableHead>Candidate / index</TableHead>
+              <TableHead>Subject</TableHead><TableHead>Proposed</TableHead>
+              <TableHead>Decision / issues</TableHead>
             </TableRow></TableHeader>
             <TableBody>{preview.rows.map(row=><TableRow key={row.rowNumber} className="border-t border-border">
-              <TableCell className="p-2">{row.rowNumber}</TableCell>
-              <TableCell className="p-2">{row.candidate||"Unknown"}<span className="block font-mono">{row.indexNumber}</span></TableCell>
-              <TableCell className="p-2">{row.subjectCode}</TableCell>
-              <TableCell className="p-2">{row.status||"Skipped"}{row.grade===null?"":": "+row.grade}</TableCell>
-              <TableCell className="p-2"><strong className={row.decision==="rejected"?"text-destructive":""}>{row.decision}</strong>
+              <TableCell>{row.rowNumber}</TableCell>
+              <TableCell>{row.candidate||"Unknown"}<span className="block font-mono">{row.indexNumber}</span></TableCell>
+              <TableCell>{row.subjectCode}</TableCell>
+              <TableCell>{row.status||"Skipped"}{row.grade===null?"":": "+row.grade}</TableCell>
+              <TableCell><strong className={row.decision==="rejected"?"text-destructive":""}>{row.decision}</strong>
                 {row.errors.length>0&&<span className="block text-destructive">{row.errors.join("; ")}</span>}</TableCell>
             </TableRow>)}</TableBody>
           </Table>

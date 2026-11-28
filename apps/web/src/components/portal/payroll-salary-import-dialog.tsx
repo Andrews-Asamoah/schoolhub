@@ -6,9 +6,9 @@ import { PortalModal } from "@/components/portal/portal-modal";
 import { apiFetch } from "@/lib/api";
 import { downloadSalaryWorkbook, readSalaryWorkbook, type SalaryWorkbookEmployee, type SalaryWorkbookRow } from "@/lib/payroll-salary-workbook";
 
+import { ghsFormat as currency } from "@/lib/format";
 type PreviewRow = SalaryWorkbookRow & { employeeId: string; employeeName: string; expectedSalary: string | null };
 type Preview = { rows: PreviewRow[]; issues: { row: number; message: string }[] };
-const currency = new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS" });
 
 export function PayrollSalaryImportDialog({ employees, onClose, onImported }: {
   employees: SalaryWorkbookEmployee[];
@@ -65,15 +65,15 @@ export function PayrollSalaryImportDialog({ employees, onClose, onImported }: {
             <p role="status" className="text-sm font-medium">{changes.length} salary change(s) · {preview.data.rows.length - changes.length} unchanged</p>
             {!!changes.length && (
               <div className="max-h-60 overflow-auto rounded-lg border border-border">
-                <Table scroll={false} className="w-full text-left text-sm">
+                <Table dense scroll={false} className="w-full text-left text-sm">
                   <TableHeader className="sticky top-0 bg-muted">
-                    <TableRow><TableHead className="p-2">Row</TableHead><TableHead className="p-2">Employee</TableHead><TableHead className="p-2 text-right">Current</TableHead><TableHead className="p-2 text-right">New</TableHead></TableRow>
+                    <TableRow><TableHead>Row</TableHead><TableHead>Employee</TableHead><TableHead className="text-right">Current</TableHead><TableHead className="text-right">New</TableHead></TableRow>
                   </TableHeader>
                   <TableBody>{changes.map(row => (
                     <TableRow key={row.row} className="border-t border-border">
-                      <TableCell className="p-2">{row.row}</TableCell><TableCell className="p-2">{row.employeeName} <span className="text-xs text-muted-foreground">({row.employeeCode})</span></TableCell>
-                      <TableCell className="p-2 text-right tabular-nums">{row.expectedSalary === null ? "—" : currency.format(Number(row.expectedSalary))}</TableCell>
-                      <TableCell className="p-2 text-right tabular-nums">{currency.format(Number(row.monthlySalary))}</TableCell>
+                      <TableCell>{row.row}</TableCell><TableCell>{row.employeeName} <span className="text-xs text-muted-foreground">({row.employeeCode})</span></TableCell>
+                      <TableCell className="text-right tabular-nums">{row.expectedSalary === null ? "—" : currency.format(Number(row.expectedSalary))}</TableCell>
+                      <TableCell className="text-right tabular-nums">{currency.format(Number(row.monthlySalary))}</TableCell>
                     </TableRow>
                   ))}</TableBody>
                 </Table>

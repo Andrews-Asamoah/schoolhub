@@ -14,6 +14,7 @@ import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
 
+import { formatGhs as money } from "@/lib/format";
 type ValueType = "PERCENTAGE" | "FIXED";
 type StudentOption = {
   id: string;
@@ -55,7 +56,6 @@ const personName = (student: StudentOption) => formatPersonName(student.profile)
 const studentReference = (student: StudentOption) => student.admissionNumber
   ? `Admission no. ${student.admissionNumber}` : `Student ID ${student.studentId ?? "unavailable"}`;
 const termDates = new Intl.DateTimeFormat("en-GH", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-const money = (value: number | string) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(Number(value) || 0);
 
 export function ConcessionsWorkspace() {
   const { canWrite } = useFinanceAccess();
@@ -304,14 +304,14 @@ export function ConcessionsWorkspace() {
           : concessionsQuery.error ? <p role="alert" className="text-sm text-destructive">{concessionsQuery.error.message}</p>
           : scholarships.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No student scholarships have been recorded.</p>
           : <div className="overflow-x-auto"><Table scroll={false} className="w-full min-w-[720px] text-left text-sm">
-            <TableHeader><TableRow className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground"><TableHead className="p-3">Student</TableHead><TableHead className="p-3">Award</TableHead><TableHead className="p-3">Value</TableHead><TableHead className="p-3">Period</TableHead><TableHead className="p-3">Status</TableHead><TableHead className="p-3">Action</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground"><TableHead>Student</TableHead><TableHead>Award</TableHead><TableHead>Value</TableHead><TableHead>Period</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
             <TableBody>{scholarships.map((award) => <TableRow key={award.id} className="border-b border-border/70 last:border-0">
-              <TableCell className="p-3"><p className="font-medium">{personName(award.student)}</p><p className="text-xs text-muted-foreground">{award.student.admissionNumber || "No admission number"}</p></TableCell>
-              <TableCell className="p-3"><p>{award.name}</p><p className="max-w-xs truncate text-xs text-muted-foreground">{award.reason || "No note provided"}</p></TableCell>
-              <TableCell className="p-3 font-medium">{award.valueType === "PERCENTAGE" ? award.value + "%" : money(award.value)}</TableCell>
-              <TableCell className="p-3 text-muted-foreground">{periodLabel(award, years)}</TableCell>
-              <TableCell className="p-3"><span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", award.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground")}>{award.isActive ? "Active" : "Inactive"}</span></TableCell>
-              <TableCell className="p-3">{canWrite && <button type="button" className={secondary} disabled={toggleScholarship.isPending} onClick={() => toggleScholarship.mutate({ id: award.id, isActive: !award.isActive })}>{award.isActive ? "Deactivate" : "Reactivate"}</button>}</TableCell>
+              <TableCell><p className="font-medium">{personName(award.student)}</p><p className="text-xs text-muted-foreground">{award.student.admissionNumber || "No admission number"}</p></TableCell>
+              <TableCell><p>{award.name}</p><p className="max-w-xs truncate text-xs text-muted-foreground">{award.reason || "No note provided"}</p></TableCell>
+              <TableCell className="font-medium">{award.valueType === "PERCENTAGE" ? award.value + "%" : money(award.value)}</TableCell>
+              <TableCell className="text-muted-foreground">{periodLabel(award, years)}</TableCell>
+              <TableCell><span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", award.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground")}>{award.isActive ? "Active" : "Inactive"}</span></TableCell>
+              <TableCell>{canWrite && <button type="button" className={secondary} disabled={toggleScholarship.isPending} onClick={() => toggleScholarship.mutate({ id: award.id, isActive: !award.isActive })}>{award.isActive ? "Deactivate" : "Reactivate"}</button>}</TableCell>
             </TableRow>)}</TableBody>
           </Table></div>}
       </section>

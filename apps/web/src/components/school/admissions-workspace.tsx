@@ -569,7 +569,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
           <Table scroll={false} className="w-full min-w-[860px] text-left text-sm">
             <TableHeader className="border-b border-border text-xs text-muted-foreground">
               <TableRow>
-                <TableHead className="p-3">
+                <TableHead>
                   <input
                     type="checkbox"
                     aria-label="Select all awaiting exam"
@@ -577,19 +577,19 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
                     onChange={(e) => setPicked(e.target.checked ? new Set(schedulable.map((r) => r.id)) : new Set())}
                   />
                 </TableHead>
-                <TableHead className="p-3">Applicant</TableHead>
-                <TableHead className="p-3">Class</TableHead>
-                <TableHead className="p-3">Guardian</TableHead>
-                <TableHead className="p-3">Status</TableHead>
-                <TableHead className="p-3">Admission fee</TableHead>
-                <TableHead className="p-3">Exam</TableHead>
-                <TableHead className="p-3">Actions</TableHead>
+                <TableHead>Applicant</TableHead>
+                <TableHead>Class</TableHead>
+                <TableHead>Guardian</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Admission fee</TableHead>
+                <TableHead>Exam</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((app) => (
                 <TableRow key={app.id} className="border-b border-border/60 align-top last:border-0">
-                  <TableCell className="p-3">
+                  <TableCell>
                     {["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED"].includes(app.status) && (
                       <input
                         type="checkbox"
@@ -603,17 +603,17 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
                       />
                     )}
                   </TableCell>
-                  <TableCell className="p-3">
+                  <TableCell>
                     <p className="font-semibold text-foreground">{formatPersonName(app)}</p>
                     <p className="text-xs text-muted-foreground">{app.applicationNumber} · {app.dateOfBirth.slice(0, 10)}</p>
                   </TableCell>
-                  <TableCell className="p-3 text-foreground">{app.class.name}</TableCell>
-                  <TableCell className="p-3 text-xs text-muted-foreground">
+                  <TableCell className="text-foreground">{app.class.name}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
                     {app.guardianFirstName} {app.guardianLastName} ({label(app.guardianRelationship)})
                     <br />{app.guardianPhone}{app.guardianEmail ? ` · ${app.guardianEmail}` : ""}
                   </TableCell>
-                  <TableCell className="p-3"><Badge value={app.status} /></TableCell>
-                  <TableCell className="p-3">
+                  <TableCell><Badge value={app.status} /></TableCell>
+                  <TableCell>
                     <FeeCell
                       app={app}
                       money={money}
@@ -625,10 +625,10 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
                       onWithdraw={() => withdraw.mutate(app.id)}
                     />
                   </TableCell>
-                  <TableCell className="min-w-[250px] p-3 align-top text-xs">
+                  <TableCell className="min-w-[250px] align-top text-xs">
                     <ExamCell app={app} canEdit={canEditExam} onSaved={() => void refresh()} />
                   </TableCell>
-                  <TableCell className="p-3">
+                  <TableCell>
                     <RowActions app={app} canDecide={canDecide} busy={act.isPending} onAct={act.mutate} onDecide={(decision) => setDeciding({ app, decision })} onAdmit={() => admit(app)} />
                   </TableCell>
                 </TableRow>

@@ -125,34 +125,34 @@ function SubscriptionsPage() {
               <Table scroll={false} className="w-full min-w-[860px] text-left text-sm">
                 <TableHeader>
                   <TableRow className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                    <TableHead scope="col" className="px-5 py-3 font-semibold">School</TableHead>
-                    <TableHead scope="col" className="px-5 py-3 font-semibold">Plan</TableHead>
-                    <TableHead scope="col" className="px-5 py-3 font-semibold">Status</TableHead>
-                    <TableHead scope="col" className="px-5 py-3 font-semibold">Expires</TableHead>
-                    <TableHead scope="col" className="hidden px-5 py-3 font-semibold md:table-cell">Students</TableHead>
-                    <TableHead scope="col" className="px-5 py-3"><span className="sr-only">Actions</span></TableHead>
+                    <TableHead scope="col">School</TableHead>
+                    <TableHead scope="col">Plan</TableHead>
+                    <TableHead scope="col">Status</TableHead>
+                    <TableHead scope="col">Expires</TableHead>
+                    <TableHead scope="col" className="hidden md:table-cell">Students</TableHead>
+                    <TableHead scope="col"><span className="sr-only">Actions</span></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-border">
                   {schools.data.data.map((school) => (
                     <TableRow key={school.id} className="transition hover:bg-muted/40">
-                      <TableCell className="px-5 py-3.5">
+                      <TableCell>
                         <p className="font-semibold text-foreground">{school.name}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">{school.code} · {school.subdomain}</p>
                       </TableCell>
-                      <TableCell className="px-5 py-3.5">
+                      <TableCell>
                         <p className="font-semibold text-foreground">{school.subscription?.planName ?? "Unassigned"}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">{school.subscription?.amount !== null && school.subscription?.amount !== undefined ? `${school.subscription.currency} ${Number(school.subscription.amount).toFixed(2)} / ${school.subscription.billingCycle?.toLowerCase() ?? "cycle"}` : "No price configured"}</p>
                       </TableCell>
-                      <TableCell className="px-5 py-3.5">
+                      <TableCell>
                         <SubscriptionBadge status={school.organization.subscriptionStatus} expiresAt={school.organization.expiresAt} />
                       </TableCell>
-                      <TableCell className="px-5 py-3.5">
+                      <TableCell>
                         <p className="text-foreground">{formatDate(school.organization.expiresAt)}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">{school.organization.expiresAt ? describeExpiry(school.organization.expiresAt) : "Never expires"}</p>
                       </TableCell>
-                      <TableCell className="hidden px-5 py-3.5 tabular-nums text-foreground md:table-cell">{school._count.students.toLocaleString()}</TableCell>
-                      <TableCell className="px-5 py-3.5">
+                      <TableCell className="hidden tabular-nums text-foreground md:table-cell">{school._count.students.toLocaleString()}</TableCell>
+                      <TableCell>
                         <div className="flex justify-end gap-2">
                           <button type="button" onClick={() => setManaging(school)} className="superadmin-button-secondary inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold">
                             <Settings2 className="size-3.5" /> Manage

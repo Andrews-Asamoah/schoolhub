@@ -125,18 +125,18 @@ export function BusUsersWorkspace() {
               <div className="overflow-x-auto rounded-xl border border-border">
                 <Table scroll={false} className="w-full text-left text-sm">
                   <TableHeader className="bg-muted/50 text-muted-foreground"><TableRow>
-                    {canWrite && <TableHead className="p-3"><span className="sr-only">Select</span></TableHead>}
-                    <TableHead className="p-3">Student</TableHead><TableHead className="p-3">Bus status</TableHead>
+                    {canWrite && <TableHead><span className="sr-only">Select</span></TableHead>}
+                    <TableHead>Student</TableHead><TableHead>Bus status</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
-                    {!visible.length && <TableRow><TableCell className="p-3 text-muted-foreground" colSpan={canWrite ? 3 : 2}>No matching students.</TableCell></TableRow>}
+                    {!visible.length && <TableRow><TableCell className="text-muted-foreground" colSpan={canWrite ? 3 : 2}>No matching students.</TableCell></TableRow>}
                     {visible.map(student => <TableRow key={student.id} className="border-t border-border">
-                      {canWrite && <TableCell className="w-10 p-3"><input type="checkbox" className="size-4 accent-primary"
+                      {canWrite && <TableCell className="w-10"><input type="checkbox" className="size-4 accent-primary"
                         aria-label={`Select ${student.name} (${student.reference})`} checked={selection.includes(student.id)}
                         disabled={save.isPending || (selection.length === 100 && !selection.includes(student.id))}
                         onChange={event => setSelection(current => event.target.checked ? [...current, student.id] : current.filter(id => id !== student.id))} /></TableCell>}
-                      <TableCell className="p-3"><p className="font-medium text-foreground">{student.name}</p><p className="text-xs text-muted-foreground">{student.reference}</p></TableCell>
-                      <TableCell className="p-3">{labels[student.busStatus]}</TableCell>
+                      <TableCell><p className="font-medium text-foreground">{student.name}</p><p className="text-xs text-muted-foreground">{student.reference}</p></TableCell>
+                      <TableCell>{labels[student.busStatus]}</TableCell>
                     </TableRow>)}
                   </TableBody>
                 </Table>

@@ -6,6 +6,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
+import { formatGhs as money } from "@/lib/format";
 interface AcademicTerm { id: string; name: string; isCurrent: boolean; startDate?: string; endDate?: string }
 interface AcademicYear { id: string; name: string; isCurrent: boolean; startDate?: string; endDate?: string; terms: AcademicTerm[] }
 interface Line { name: string; group: string; amount: string; count: number; sharePercent: string }
@@ -22,7 +23,6 @@ interface ExpenditureBreakdown {
 }
 type Scope = "term" | "year" | "all";
 
-const money = (value: string | number) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(Number(value) || 0);
 const CHART_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 const tab = (active: boolean) => cn("rounded-lg px-3 py-1.5 text-sm font-semibold transition", active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted");
 

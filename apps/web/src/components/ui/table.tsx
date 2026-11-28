@@ -8,11 +8,15 @@ import { cn } from "@/lib/utils";
 type TableProps = React.TableHTMLAttributes<HTMLTableElement> & {
   /** Disable the wrapper when the caller already provides a scroll or print container. */
   scroll?: boolean;
+  /** Tighter rows for previews and dialogs. Density lives here so cells never set their own padding. */
+  dense?: boolean;
 };
 
+const DENSE = "[&_th]:h-9 [&_th]:px-3 [&_td]:px-3 [&_td]:py-2";
+
 const Table = React.forwardRef<HTMLTableElement, TableProps>(
-  ({ className, scroll = true, ...props }, ref) => {
-    const table = <table ref={ref} className={cn("w-full caption-bottom border-collapse text-sm", className)} {...props} />;
+  ({ className, scroll = true, dense = false, ...props }, ref) => {
+    const table = <table ref={ref} className={cn("w-full caption-bottom border-collapse text-sm", dense && DENSE, className)} {...props} />;
     return scroll ? <div className="relative w-full overflow-x-auto">{table}</div> : table;
   },
 );

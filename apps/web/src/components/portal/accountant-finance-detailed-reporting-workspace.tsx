@@ -10,6 +10,7 @@ import { apiFetch, getClientSubdomain } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Users, WalletCards } from "lucide-react";
 
+import { formatGhs as money } from "@/lib/format";
 interface Student {
   id: string;
   admissionNumber: string;
@@ -140,12 +141,6 @@ async function fetchAllFinancePages<T extends { id: string }>(
   return records;
 }
 
-const money = (value: number) =>
-  new Intl.NumberFormat("en-GH", {
-    style: "currency",
-    currency: "GHS",
-    maximumFractionDigits: 2,
-  }).format(Number.isFinite(value) ? value : 0);
 
 function amountCents(value: number | string): bigint {
   const raw = (typeof value === "number" ? value.toFixed(2) : value).trim();

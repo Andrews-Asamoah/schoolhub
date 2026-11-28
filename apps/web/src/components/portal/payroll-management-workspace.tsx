@@ -18,6 +18,7 @@ import { useFinanceApproval } from "@/lib/finance-approval";
 import { useSession } from "@/lib/auth-client";
 import { LabeledField } from "@/components/forms/labeled-controls";
 
+import { formatGhs as money } from "@/lib/format";
 type PayrollStatus = "DRAFT" | "APPROVED" | "PAID" | "CANCELLED";
 type PaymentMethod = "CASH" | "BANK_TRANSFER" | "CHEQUE" | "MOBILE_MONEY" | "CARD" | "ONLINE" | "OTHER";
 interface PersonName {
@@ -78,7 +79,6 @@ interface TransitionTarget {
   payroll: PayrollRecord;
   nextStatus: "APPROVED" | "PAID" | "CANCELLED";
 }
-const money = (value: number | string) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0);
 const monthName = (month: number, year: number) => new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1)));
 const statusTone = (status: string) => status === "PAID" ? "bg-success/10 text-success" : status === "APPROVED" ? "bg-primary/10 text-primary" : status === "CANCELLED" ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-foreground";
 const fieldClass = "h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/30";

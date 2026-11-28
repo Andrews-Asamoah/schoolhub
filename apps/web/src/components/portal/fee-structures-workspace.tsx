@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
 import { LabeledField } from "@/components/forms/labeled-controls";
 
+import { formatGhs as money } from "@/lib/format";
 interface FeeRegistryItem {
   id: string;
   name: string;
@@ -65,12 +66,6 @@ interface FeeStructureInput {
   items: { registryItemId?: string; name: string; amount: number; isOptional: boolean; followsBusRoster?: boolean; description?: string }[];
 }
 
-const money = (amount: number) => new Intl.NumberFormat("en-GH", {
-  style: "currency",
-  currency: "GHS",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-}).format(amount);
 const blankItem = (): FeeItemDraft => ({
   rowId: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
   registryItemId: "",

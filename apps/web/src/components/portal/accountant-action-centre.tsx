@@ -4,11 +4,11 @@ import { AlertTriangle, CheckCircle2, ChevronRight, Info, LoaderCircle, OctagonA
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
+import { formatGhs as money } from "@/lib/format";
 type Severity = "critical" | "warning" | "info";
 interface ActionItem { id: string; severity: Severity; title: string; detail: string; page: string; count?: number; amount?: string }
 interface ActionCentre { generatedAt: string; items: ActionItem[] }
 
-const money = (value: string) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(Number(value) || 0);
 const look: Record<Severity, { icon: typeof Info; box: string; label: string }> = {
   critical: { icon: OctagonAlert, box: "border-destructive/30 bg-destructive/5", label: "Blocking" },
   warning: { icon: AlertTriangle, box: "border-warning/30 bg-warning/5", label: "Needs action" },

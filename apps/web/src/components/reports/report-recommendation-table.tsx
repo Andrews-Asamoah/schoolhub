@@ -148,7 +148,7 @@ export function ReportRecommendationTable({
           </TableRow>
           {expanded && <TableRow className="bg-muted/20 hover:bg-muted/20">
             <TableCell />
-            <TableCell colSpan={5} className="py-3">
+            <TableCell colSpan={5}>
               {row.subjects.length === 0
                 ? <p className="text-xs text-muted-foreground">No subject results in this report.</p>
                 : <ul className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2 lg:grid-cols-3">

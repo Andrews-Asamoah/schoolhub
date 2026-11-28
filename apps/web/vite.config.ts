@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     // 1. TanStack Router — must come BEFORE the React plugin
     //    Scans src/routes/ and auto-generates src/routeTree.gen.ts
-    tanstackRouter({ target: "react", routesDirectory: "./src/routes" }),
+    tanstackRouter({ target: "react", routesDirectory: "./src/routes", autoCodeSplitting: true }),
 
     // 2. Official React plugin (uses OXC with Vite 8)
     react(),
@@ -26,6 +26,9 @@ export default defineConfig({
       output: {
         codeSplitting: {
           groups: [
+            // Tiny helpers used by every component. Without their own group they were folded into the
+            // recharts chunk, which then had to load on every page.
+            { name: "ui-helpers", test: /node_modules[\\/](clsx|tailwind-merge|class-variance-authority)[\\/]/, priority: 40 },
             { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 30 },
             { name: "tanstack", test: /node_modules[\\/]@tanstack[\\/]/, priority: 20 },
             { name: "recharts", test: /node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor)[\\/]/, priority: 10 },

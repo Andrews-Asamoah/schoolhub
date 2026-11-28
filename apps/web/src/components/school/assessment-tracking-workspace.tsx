@@ -175,18 +175,18 @@ export function AssessmentTrackingWorkspace({ role }: { role?: string }) {
             <section className="overflow-x-auto rounded-2xl border border-border/80 bg-card">
               <Table scroll={false} className="w-full text-left text-xs">
                 <TableHeader className="bg-muted/50 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                  <TableRow><TableHead className="px-4 py-3">Teacher</TableHead><TableHead className="px-3 py-3">Sheets</TableHead><TableHead className="px-3 py-3">Submitted</TableHead><TableHead className="px-3 py-3">Overdue</TableHead><TableHead className="min-w-48 px-3 py-3">Pupils done</TableHead></TableRow>
+                  <TableRow><TableHead>Teacher</TableHead><TableHead>Sheets</TableHead><TableHead>Submitted</TableHead><TableHead>Overdue</TableHead><TableHead className="min-w-48">Pupils done</TableHead></TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-border/60">
                   {data.teachers.map((row) => (
                     <TableRow key={row.teacherId ?? "none"} className={cn(!row.teacherId && "bg-warning/5")}>
-                      <TableHead scope="row" className="px-4 py-2.5 text-left font-semibold">
+                      <TableHead scope="row" className="text-left">
                         {row.teacherId ? <button type="button" className="hover:underline" onClick={() => { setTeacherId(row.teacherId!); setTab("sheets"); }}>{row.name}</button> : row.name}
                       </TableHead>
-                      <TableCell className="px-3 py-2.5 tabular-nums">{row.sheets}</TableCell>
-                      <TableCell className="px-3 py-2.5 tabular-nums">{row.submitted}</TableCell>
-                      <TableCell className={cn("px-3 py-2.5 tabular-nums", row.overdue > 0 && "font-semibold text-destructive")}>{row.overdue}</TableCell>
-                      <TableCell className="px-3 py-2.5"><Progress percent={row.percent} label={`${row.done}/${row.pupils}`} /></TableCell>
+                      <TableCell className="tabular-nums">{row.sheets}</TableCell>
+                      <TableCell className="tabular-nums">{row.submitted}</TableCell>
+                      <TableCell className={cn("tabular-nums", row.overdue > 0 && "font-semibold text-destructive")}>{row.overdue}</TableCell>
+                      <TableCell><Progress percent={row.percent} label={`${row.done}/${row.pupils}`} /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -230,23 +230,23 @@ function SheetsTable({ sheets, onExtend, onReopen }: { sheets: TrackingSheet[]; 
     <section className="overflow-x-auto rounded-2xl border border-border/80 bg-card">
       <Table scroll={false} className="w-full text-left text-xs">
         <TableHeader className="bg-muted/50 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-          <TableRow><TableHead className="px-4 py-3">Class</TableHead><TableHead className="px-3 py-3">Subject</TableHead><TableHead className="px-3 py-3">Teacher</TableHead><TableHead className="min-w-48 px-3 py-3">Progress</TableHead><TableHead className="px-3 py-3">Status</TableHead><TableHead className="px-3 py-3">Deadline</TableHead><TableHead className="px-3 py-3 print:hidden"><span className="sr-only">Actions</span></TableHead></TableRow>
+          <TableRow><TableHead>Class</TableHead><TableHead>Subject</TableHead><TableHead>Teacher</TableHead><TableHead className="min-w-48">Progress</TableHead><TableHead>Status</TableHead><TableHead>Deadline</TableHead><TableHead className="print:hidden"><span className="sr-only">Actions</span></TableHead></TableRow>
         </TableHeader>
         <TableBody className="divide-y divide-border/60">
           {sheets.map((sheet) => (
             <TableRow key={`${sheet.classId}|${sheet.subjectId}`}>
-              <TableHead scope="row" className="px-4 py-2.5 text-left font-semibold">{sheet.className}</TableHead>
-              <TableCell className="px-3 py-2.5">{sheet.subjectName}</TableCell>
-              <TableCell className="px-3 py-2.5">{sheet.teachers.length ? sheet.teachers.map((teacher) => teacher.name).join(", ") : <span className="text-warning">Not assigned</span>}</TableCell>
-              <TableCell className="px-3 py-2.5">
+              <TableHead scope="row" className="text-left">{sheet.className}</TableHead>
+              <TableCell>{sheet.subjectName}</TableCell>
+              <TableCell>{sheet.teachers.length ? sheet.teachers.map((teacher) => teacher.name).join(", ") : <span className="text-warning">Not assigned</span>}</TableCell>
+              <TableCell>
                 {sheet.total === 0 ? <span className="text-muted-foreground">No pupils</span> : <Progress percent={sheet.percent} label={`${sheet.done}/${sheet.total}${sheet.excused ? ` · ${sheet.excused} excused` : ""}`} />}
               </TableCell>
-              <TableCell className="px-3 py-2.5">
+              <TableCell>
                 <Badge variant={STATUS_VARIANT[sheet.status]}>{STATUS_LABEL[sheet.status]}</Badge>
                 {sheet.hasPendingCorrection && <Badge variant="warning" className="ml-1">Correction pending</Badge>}
               </TableCell>
-              <TableCell className="px-3 py-2.5 tabular-nums text-muted-foreground">{formatDate(sheet.deadline)}</TableCell>
-              <TableCell className="px-3 py-2.5 print:hidden">
+              <TableCell className="tabular-nums text-muted-foreground">{formatDate(sheet.deadline)}</TableCell>
+              <TableCell className="print:hidden">
                 <div className="flex justify-end gap-1.5">
                   {sheet.status === "SUBMITTED" ? (
                     <button type="button" onClick={() => onReopen(sheet)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2.5 font-semibold hover:bg-muted"><Unlock className="size-3.5" /> Reopen</button>
@@ -354,14 +354,14 @@ function Corrections({ canDecide, onDecided }: { canDecide: boolean; onDecided: 
           <p className="px-4 pt-3 text-xs"><span className="font-semibold">Reason: </span>{row.reason}</p>
           <div className="overflow-x-auto p-4">
             <Table scroll={false} className="w-full text-left text-xs">
-              <TableHeader className="text-[10px] uppercase tracking-wide text-muted-foreground/70"><TableRow><TableHead className="py-1.5 pr-3">Pupil</TableHead><TableHead className="px-3">Component</TableHead><TableHead className="px-3">Was</TableHead><TableHead className="px-3">Now</TableHead></TableRow></TableHeader>
+              <TableHeader className="text-[10px] uppercase tracking-wide text-muted-foreground/70"><TableRow><TableHead>Pupil</TableHead><TableHead>Component</TableHead><TableHead>Was</TableHead><TableHead>Now</TableHead></TableRow></TableHeader>
               <TableBody className="divide-y divide-border/50">
                 {row.items.map((item, index) => (
                   <TableRow key={index}>
-                    <TableHead scope="row" className="py-1.5 pr-3 text-left font-medium">{item.studentName}</TableHead>
-                    <TableCell className="px-3">{item.componentName}{item.occurrenceIndex > 0 ? ` ${item.occurrenceIndex + 1}` : ""}</TableCell>
-                    <TableCell className="px-3 tabular-nums text-muted-foreground">{formatMark(item.previousMarks)}</TableCell>
-                    <TableCell className="px-3 font-semibold tabular-nums">{formatMark(item.requestedMarks)}{item.maxMarks !== null && <span className="font-normal text-muted-foreground"> / {item.maxMarks}</span>}</TableCell>
+                    <TableHead scope="row" className="text-left">{item.studentName}</TableHead>
+                    <TableCell>{item.componentName}{item.occurrenceIndex > 0 ? ` ${item.occurrenceIndex + 1}` : ""}</TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">{formatMark(item.previousMarks)}</TableCell>
+                    <TableCell className="font-semibold tabular-nums">{formatMark(item.requestedMarks)}{item.maxMarks !== null && <span className="font-normal text-muted-foreground"> / {item.maxMarks}</span>}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

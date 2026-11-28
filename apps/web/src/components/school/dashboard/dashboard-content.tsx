@@ -7,7 +7,6 @@ import {
   ArrowRight, BookOpen, Building2, CalendarDays, CircleAlert, GraduationCap,
   Lock, UsersRound, WalletCards, UserRoundPlus, type LucideIcon,
 } from "lucide-react";
-import { DashboardInfographics } from "@/components/school/dashboard/dashboard-infographics";
 import { DashboardAttendance } from "@/components/school/dashboard/dashboard-attendance";
 import { RecentActivityCard, SchoolYearCard } from "@/components/school/dashboard/dashboard-activity";
 import type { DashboardAnalytics } from "@/components/school/dashboard/dashboard-data";
@@ -15,11 +14,14 @@ import { apiFetch } from "@/lib/api";
 import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-switcher";
 import { getSchoolNavGroupsForRole } from "@/lib/school-navigation";
 import { useSession } from "@/lib/auth-client";
+const DashboardInfographics = lazy(() => import("@/components/school/dashboard/dashboard-infographics").then((m) => ({ default: m.DashboardInfographics })));
+const AccountantFinanceCharts = lazy(() => import("@/components/portal/accountant-finance-charts").then((m) => ({ default: m.AccountantFinanceCharts })));
+const ChartsFallback = () => <div className="h-80 animate-pulse rounded-2xl bg-muted/60" aria-label="Loading charts" />;
 const GuardianPortalWorkspace = lazy(() => import("@/components/portal/guardian-portal-workspace").then(module => ({default:module.GuardianPortalWorkspace})));
 import { StudentOverview } from "@/components/portal/student-overview";
-import { AccountantFinanceCharts } from "@/components/portal/accountant-finance-charts";
 import { useSchoolOrganization } from "@/components/school/school-organization";
 
+import { ghsFormat as moneyFormat } from "@/lib/format";
 interface SetupYear {
   id: string; name: string; startDate: string; endDate: string; isCurrent: boolean;
   terms: { id: string; name: string; startDate: string; endDate: string; isCurrent: boolean }[];
@@ -49,7 +51,6 @@ interface AccountantFinanceSummary {
 }
 interface Metric { label: string; value: string; detail: string; icon: LucideIcon; className: string; }
 const numberFormat = new Intl.NumberFormat("en-GH");
-const moneyFormat = new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 });
 function MetricTile({ metric }: { metric: Metric }) {
   return <article className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
     <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-medium text-muted-foreground">{metric.label}</p><p className="mt-3 break-words text-2xl font-bold tracking-tight text-foreground">{metric.value}</p></div><span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${metric.className}`}><metric.icon className="size-[18px]" /></span></div>
@@ -177,7 +178,9 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
           <span><strong className="font-semibold text-foreground">Read-only finance overview.</strong> This dashboard shows school-wide totals and trends only. Detailed payment, expense, student-account and payroll records are restricted to authorized finance roles.</span>
         </div>
       )}
-      <DashboardInfographics data={data} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} selectedMonths={selectedMonths} onMonthsChange={setSelectedMonths} />
+      <Suspense fallback={<ChartsFallback />}>
+        <DashboardInfographics data={data} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} selectedMonths={selectedMonths} onMonthsChange={setSelectedMonths} />
+      </Suspense>
       {activeRole === "accountant" && (
         <section className="mt-6 space-y-3" aria-label="Accountant finance dashboard">
           <div>
@@ -194,10 +197,9 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
               Finance charts could not load. Check your accountant finance permissions and API connection, then refresh this dashboard.
             </p>
           ) : (
-            <AccountantFinanceCharts
-              summary={accountantSummaryQuery.data ?? null}
-              expenses={accountantExpensesQuery.data ?? []}
-            />
+            <Suspense fallback={<ChartsFallback />}>
+              <AccountantFinanceCharts summary={accountantSummaryQuery.data ?? null} expenses={accountantExpensesQuery.data ?? []} />
+            </Suspense>
           )}
         </section>
       )}

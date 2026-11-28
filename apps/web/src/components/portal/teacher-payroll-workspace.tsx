@@ -6,10 +6,7 @@ import { apiFetch, getClientSubdomain } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
 import { ServerExportButton } from "./server-export-button";
 
-const money = new Intl.NumberFormat("en-GH", {
-  style: "currency",
-  currency: "GHS",
-});
+import { ghsFormat as money } from "@/lib/format";
 const month = new Intl.DateTimeFormat("en-GB", {
   month: "long",
   year: "numeric",

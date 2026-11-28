@@ -14,7 +14,7 @@ import { BulkImportDialog } from "@/components/bulk-import/bulk-import-dialog";
 import { FileDropzone } from "@/components/bulk-import/file-dropzone";
 import { ImportStartPanels } from "@/components/bulk-import/import-start-panels";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, retryOnRateLimit } from "@/lib/api";
 import {
   chunk,
   credentialsTable,
@@ -137,10 +137,12 @@ export function StudentImportWizard({
       }
       const rows = batches.current[next.current]!;
       try {
-        const response = await apiFetch<BatchResponse>("/students/import", {
-          method: "POST",
-          body: JSON.stringify({ batchId: batchId.current, createGuardianLogins, rows }),
-        });
+        const response = await retryOnRateLimit(() =>
+          apiFetch<BatchResponse>("/students/import", {
+            method: "POST",
+            body: JSON.stringify({ batchId: batchId.current, createGuardianLogins, rows }),
+          }),
+        );
         setResults((current) => [...current, ...response.results]);
         setProgress((current) => ({ ...current, done: current.done + rows.length }));
         next.current += 1;

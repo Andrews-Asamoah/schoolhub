@@ -48,6 +48,8 @@ import {
 import type { School } from "@prisma/client";
 import { z } from "zod";
 import { FinanceApprovalSettingsService } from "./finance-approval-settings.service.js";
+import { Throttle } from "@nestjs/throttler";
+import { BULK_THROTTLE } from "../../common/bulk-throttle.js";
 
 const feeStructureSchema = z.object({
   name: z.string().trim().min(2, "Enter a fee structure name").max(120),
@@ -241,6 +243,7 @@ export class FinanceController {
   }
 
   @Post("scholarships/bulk")
+  @Throttle(BULK_THROTTLE)
   @Roles(...FINANCE_WRITE_ROLES)
   @FinanceSelfAudited()
   createStudentScholarships(

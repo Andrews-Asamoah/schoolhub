@@ -399,20 +399,20 @@ export function AssessmentEntryWorkspace({
               <Table scroll={false} className="w-full text-left text-xs">
                 <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableHead scope="col" className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Pupil</TableHead>
+                    <TableHead scope="col">Pupil</TableHead>
                     {components.map((component) => (
-                      <TableHead key={component.id} scope="col" colSpan={component.slots} className="px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                      <TableHead key={component.id} scope="col" colSpan={component.slots} className="text-center">
                         {component.name}
                         {component.subjectStrandName && <span className="block font-semibold normal-case tracking-normal">{component.subjectStrandName}</span>}
                         <span className="block font-normal normal-case tracking-normal">out of {component.maxMarks} · {component.weight}%</span>
                         {!component.canEdit && mode === "teacher" && <span className="block font-normal normal-case tracking-normal">Read only</span>}
                       </TableHead>
                     ))}
-                    <TableHead scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Total (%)</TableHead>
-                    <TableHead scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Grade</TableHead>
-                    <TableHead scope="col" className="px-3 py-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Description</TableHead>
-                    <TableHead scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Pos.</TableHead>
-                    <TableHead scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Absent / excused</TableHead>
+                    <TableHead scope="col" className="text-center">Total (%)</TableHead>
+                    <TableHead scope="col" className="text-center">Grade</TableHead>
+                    <TableHead scope="col">Description</TableHead>
+                    <TableHead scope="col" className="text-center">Pos.</TableHead>
+                    <TableHead scope="col" className="text-center">Absent / excused</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-border/60">
@@ -420,7 +420,7 @@ export function AssessmentEntryWorkspace({
                     const hasRestrictedMarks = student.marks.some((mark) => !editableComponentIds.has(mark.componentId));
                     return (
                     <TableRow key={student.studentId}>
-                      <TableHead scope="row" className="px-4 py-2 text-left font-semibold text-foreground">
+                      <TableHead scope="row" className="text-left text-foreground">
                         {student.name}
                         <span className="block text-[10px] font-normal text-muted-foreground/70">{student.admissionNumber ?? ""}</span>
                       </TableHead>
@@ -431,7 +431,7 @@ export function AssessmentEntryWorkspace({
                           const number = value.trim() === "" ? null : Number(value);
                           const bad = number !== null && (!Number.isFinite(number) || number < 0 || number > component.maxMarks);
                           return (
-                            <TableCell key={key} className="px-1.5 py-1.5 text-center">
+                            <TableCell key={key} className="text-center">
                               <input
                                 type="number"
                                 inputMode="decimal"
@@ -463,19 +463,19 @@ export function AssessmentEntryWorkspace({
                           );
                         }),
                       )}
-                      <TableCell className="px-3 py-2 text-center font-semibold tabular-nums text-foreground">{student.marks.length ? `${student.percentage}%` : "—"}</TableCell>
-                      <TableCell className="px-3 py-2 text-center">
+                      <TableCell className="text-center font-semibold tabular-nums text-foreground">{student.marks.length ? `${student.percentage}%` : "—"}</TableCell>
+                      <TableCell className="text-center">
                         {student.grade ? (
                           <span className="rounded-md bg-primary/10 px-2 py-0.5 font-bold text-primary">{student.grade}</span>
                         ) : (
                           <span className="text-muted-foreground/70" title={student.marks.length ? "Waiting for the remaining marks" : undefined}>{student.marks.length ? "Incomplete" : "—"}</span>
                         )}
                       </TableCell>
-                      <TableCell className="px-3 py-2 text-muted-foreground">
+                      <TableCell className="text-muted-foreground">
                         {student.grade ? sheet.template?.grades.find((band) => band.grade === student.grade)?.description || "—" : "—"}
                       </TableCell>
-                      <TableCell className="px-3 py-2 text-center tabular-nums text-muted-foreground">{student.position ?? "—"}</TableCell>
-                      <TableCell className="px-3 py-2 text-center">
+                      <TableCell className="text-center tabular-nums text-muted-foreground">{student.position ?? "—"}</TableCell>
+                      <TableCell className="text-center">
                         <input
                           type="checkbox"
                           aria-label={`${student.name} is absent or excused`}

@@ -57,23 +57,23 @@ export function BankMatchSuggestions({ reconciliationId, busy, onApply }: {
           <span role="status" className="text-sm text-muted-foreground">{chosen.length} of {matches.length} selected</span>
         </div>
         <div className="max-h-72 overflow-auto rounded-lg border border-border bg-card">
-          <Table scroll={false} className="w-full text-left text-sm">
+          <Table dense scroll={false} className="w-full text-left text-sm">
             <TableHeader className="sticky top-0 bg-card text-muted-foreground"><TableRow>
-              <TableHead scope="col" className="p-2"><span className="sr-only">Select</span></TableHead>
-              <TableHead scope="col" className="p-2">Statement line</TableHead>
-              <TableHead scope="col" className="p-2">Ledger posting</TableHead>
-              <TableHead scope="col" className="p-2 text-right">Amount</TableHead>
+              <TableHead scope="col"><span className="sr-only">Select</span></TableHead>
+              <TableHead scope="col">Statement line</TableHead>
+              <TableHead scope="col">Ledger posting</TableHead>
+              <TableHead scope="col" className="text-right">Amount</TableHead>
             </TableRow></TableHeader>
             <TableBody className="divide-y divide-border">
               {matches.map(match => <TableRow key={match.statementLineId}>
-                <TableCell className="p-2">
+                <TableCell>
                   <input type="checkbox" className="size-4 accent-primary" checked={selection.has(match.statementLineId)}
                     aria-label={`Match ${match.reference} to ${match.transactionNumber}`} disabled={busy || query.isFetching}
                     onChange={event => setSelected(event.target.checked ? [...selected, match.statementLineId] : selected.filter(id => id !== match.statementLineId))} />
                 </TableCell>
-                <TableCell className="p-2"><div>{match.statementDescription}</div><div className="text-xs text-muted-foreground">{match.date.slice(0, 10)} · {match.reference}</div></TableCell>
-                <TableCell className="p-2"><div>{match.postingDescription}</div><div className="text-xs text-muted-foreground">{match.transactionNumber}</div></TableCell>
-                <TableCell className="whitespace-nowrap p-2 text-right tabular-nums">{match.amount}</TableCell>
+                <TableCell><div>{match.statementDescription}</div><div className="text-xs text-muted-foreground">{match.date.slice(0, 10)} · {match.reference}</div></TableCell>
+                <TableCell><div>{match.postingDescription}</div><div className="text-xs text-muted-foreground">{match.transactionNumber}</div></TableCell>
+                <TableCell className="whitespace-nowrap text-right tabular-nums">{match.amount}</TableCell>
               </TableRow>)}
             </TableBody>
           </Table>
