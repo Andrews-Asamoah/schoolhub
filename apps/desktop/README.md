@@ -103,6 +103,21 @@ To enter the desktop folder from the repository root, run `cd apps/desktop`.
 From inside `apps`, run `cd desktop`. Git Bash uses forward slashes for these
 paths and `export` to pass the API origin to Tauri and Cargo.
 
+If `openssl-sys` reports `Can't locate Locale/Maketext/Simple.pm` and prints
+module paths under `/usr/share/perl5`, it picked Git Bash's Perl. Point
+OpenSSL at Strawberry Perl and verify the module before retrying the build.
+Use the actual Strawberry Perl path from `where.exe perl` if it differs
+from the example.
+
+```bash
+export OPENSSL_SRC_PERL='C:/Strawberry/perl/bin/perl.exe'
+"$OPENSSL_SRC_PERL" -MLocale::Maketext::Simple -e 'print "Perl module OK\n"'
+```
+
+Keep the same shell open and rerun the build command. If the module check
+fails with Strawberry Perl itself, repair the installation or install the
+missing module using Strawberry Perl's CPAN client.
+
 [tauri-prereqs]: https://v2.tauri.app/start/prerequisites/#windows
 [release-guide]: ../../docs/runbooks/production-versioning.md
 
