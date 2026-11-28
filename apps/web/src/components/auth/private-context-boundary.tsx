@@ -1,3 +1,4 @@
+import { SchoolEntryLoading, useVerifiedSchool } from "./school-entry";
 import { clearPrivateSessionPreferences } from "@/lib/private-session";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useSession } from "@/lib/auth-client";
@@ -20,6 +21,7 @@ const roleSnapshot = () => window.localStorage.getItem("schoolhub-active-role") 
 /** Never mount a new principal/role against the previous context's private cache. */
 export function PrivateContextBoundary({ children }: { children: ReactNode }) {
   const { data: session, isPending } = useSession();
+  const school = useVerifiedSchool();
   const role = useSyncExternalStore(subscribe, roleSnapshot, () => "");
   const identity = JSON.stringify([session?.user.id ?? null, session?.session.activeOrganizationId ?? null, role]);
   const previousUser = useRef(session?.user.id);
@@ -47,6 +49,7 @@ export function PrivateContextBoundary({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [identity, isPending, router]);
   if (isPending || ready?.identity !== identity) {
+    if (school) return <SchoolEntryLoading title={`Opening ${school.name}`} detail="Checking your sign-in session." />;
     return <p role="status" className="p-6 text-sm text-muted-foreground">Loading your workspace…</p>;
   }
   return <QueryClientProvider key={identity} client={ready.client}><div className="contents">{children}</div>{import.meta.env.DEV&&<ReactQueryDevtools initialIsOpen={false}/>}</QueryClientProvider>;
