@@ -1,3 +1,4 @@
+import { signInConnectionMessage } from "@/lib/platform/types";
 import { ArrowLeft, CircleAlert, KeyRound, LoaderCircle, ShieldCheck } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import { authClient } from "@/lib/auth-client";
@@ -51,8 +52,8 @@ export function TwoFactorChallenge({ onVerified, onCancel, allowTrustDevice = fa
         return;
       }
       await onVerified(result.data?.user as SignedInUser | undefined);
-    } catch {
-      setError("We couldn’t connect. Check your internet connection and try again.");
+    } catch (cause) {
+      setError(signInConnectionMessage(cause));
     } finally {
       setBusy(false);
     }

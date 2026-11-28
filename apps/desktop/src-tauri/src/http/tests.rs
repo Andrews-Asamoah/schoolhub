@@ -577,3 +577,19 @@ async fn webview_cannot_choose_a_different_installation_through_generic_transpor
             .contains("native device command"));
     }
 }
+
+#[tokio::test]
+async fn failed_loopback_sign_in_identifies_the_api_to_start() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin = format!("http://{}", listener.local_addr().unwrap());
+    drop(listener);
+
+    let desktop = DesktopHttp::new(&origin, true).unwrap();
+    let result = desktop.request(request("/api/auth/sign-in/email")).await;
+    assert!(matches!(
+        result,
+        Err(message) if message == format!(
+            "Could not reach SchoolHub at {origin}. Start the SchoolHub API on this computer and try again."
+        )
+    ));
+}

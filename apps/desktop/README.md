@@ -138,6 +138,27 @@ For development with an installed Tauri CLI, use `cargo tauri dev --features
 shell` from this directory. Its frontend hook runs `dev:desktop`; debug builds
 use loopback HTTP unless SCHOOLHUB_API_ORIGIN is set.
 
+### Check the local API if sign-in cannot connect
+
+The debug executable talks directly to the NestJS API. Start the API from the
+repository root and keep it running alongside PostgreSQL.
+
+```sh
+pnpm --filter @schoolhub/api dev
+```
+
+From another terminal, check the API used by the desktop build.
+
+```sh
+curl.exe --noproxy "*" -i http://127.0.0.1:3001/api/health/ready
+```
+
+HTTP 200 with `"status":"ready"` confirms both the API and database are reachable.
+Connection refusal means the API is stopped or listening on another port.
+HTTP 503 means the API is running but its database check failed. Check the API
+terminal for the startup or database error. If the port differs from the build's
+`SCHOOLHUB_API_ORIGIN`, rebuild with the API's actual origin.
+
 ## Native tests
 
 From the repository root:

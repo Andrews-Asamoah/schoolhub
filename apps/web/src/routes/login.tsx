@@ -1,3 +1,4 @@
+import { signInConnectionMessage } from "@/lib/platform/types";
 import { platform } from "@schoolhub/platform";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
@@ -157,8 +158,8 @@ function LoginPage() {
       }
 
       await finishInteractiveSignIn(result.data?.user);
-    } catch {
-      setError("We couldn’t connect. Check your internet connection and try again.");
+    } catch (cause) {
+      setError(signInConnectionMessage(cause));
     } finally {
       setLoading(false);
     }

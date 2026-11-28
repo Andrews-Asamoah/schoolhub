@@ -1,3 +1,4 @@
+import { DesktopConnectionError } from "../types";
 import { DESKTOP_SESSION_NOTICE } from "./session";
 import { DESKTOP_ACCESS_EVENT, desktopAccessIssue } from "./access";
 import { invoke } from "@tauri-apps/api/core";
@@ -38,6 +39,12 @@ export const desktopFetch: typeof fetch = async (input, init) => {
       headers,
       body,
     },
+  }).catch((error: unknown) => {
+    // Only surface the native transport's safe origin and connection hint.
+    if (typeof error === "string" && error.startsWith("Could not reach SchoolHub at ")) {
+      throw new DesktopConnectionError(error);
+    }
+    throw error;
   });
   // IPC requests currently finish in Rust even if the caller cancels. Do not
   // deliver their response into a cancelled or changed application context.
