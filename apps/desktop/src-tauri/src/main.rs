@@ -61,9 +61,6 @@ fn main() {
     builder
         .manage(updates::UpdateInstall::default())
         .setup(move |app| {
-            if let Some(window) = app.get_webview_window("main") {
-                window.set_title(&format!("schoolHub v{}", app.package_info().version))?;
-            }
             let root = app.path().app_local_data_dir()?.join("installations");
             app.manage(http.with_installation_root(root));
             Ok(())
