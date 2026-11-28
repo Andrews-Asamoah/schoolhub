@@ -1,7 +1,7 @@
 import { SchoolReadinessPanel } from "@/components/superadmin/school-readiness-panel";
 import { hasSchoolAdministrationRole } from "@schoolhub/shared";
 import { SchoolSmsAccountPanel } from "@/components/school/school-sms-account-panel";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -69,7 +69,8 @@ interface SchoolDetail {
     metadata: string | null;
     members: Member[];
   };
-  _count: { students: number; teachers: number };
+  _count: { students: number; teachers: number; guardians: number; staff: number };
+  userCounts: { total: number; headteachers: number };
   academicYears: { id: string; name: string; isCurrent: boolean }[];
 }
 
@@ -93,7 +94,8 @@ interface SchoolForm {
 }
 
 function SchoolDetailPage() {
-  const { schoolId } = Route.useParams();
+  const { schoolId: schoolReference } = Route.useParams();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
   const [schoolForm, setSchoolForm] = useState<SchoolForm>({
@@ -116,10 +118,18 @@ function SchoolDetailPage() {
   const queryClient = useQueryClient();
 
   const { data: school, isPending, error, refetch } = useQuery({
-    queryKey: ["superadmin", "school", schoolId],
-    queryFn: () => apiFetch<SchoolDetail>(`/super-admin/schools/${schoolId}`),
+    queryKey: ["superadmin", "school", schoolReference],
+    queryFn: () => apiFetch<SchoolDetail>(`/super-admin/schools/${encodeURIComponent(schoolReference)}`),
     retry: false,
   });
+
+  const schoolId = school?.id ?? schoolReference;
+
+  useEffect(() => {
+    if (school?.subdomain && schoolReference !== school.subdomain) {
+      void navigate({ to: "/admin/schools/$schoolId", params: { schoolId: school.subdomain }, replace: true });
+    }
+  }, [navigate, school, schoolReference]);
 
   const {
     data: onboarding,
@@ -129,6 +139,7 @@ function SchoolDetailPage() {
   } = useQuery({
     queryKey: ["superadmin", "school-onboarding", schoolId],
     queryFn: () => apiFetch<SchoolOnboardingStatus>(`/super-admin/schools/${schoolId}/onboarding`),
+    enabled: Boolean(school),
     retry: false,
   });
 
@@ -146,7 +157,7 @@ function SchoolDetailPage() {
 
   function refreshSchoolData() {
     void queryClient.invalidateQueries({
-      queryKey: ["superadmin", "school", schoolId],
+      queryKey: ["superadmin", "school", schoolReference],
     });
     void queryClient.invalidateQueries({ queryKey: ["superadmin", "schools"] });
     void queryClient.invalidateQueries({ queryKey: ["superadmin", "users"] });
@@ -178,7 +189,11 @@ function SchoolDetailPage() {
           schoolAddress: body.schoolAddress || undefined,
         }),
       }),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      if (updated.subdomain !== schoolReference) {
+        queryClient.setQueryData(["superadmin", "school", updated.subdomain], updated);
+        void navigate({ to: "/admin/schools/$schoolId", params: { schoolId: updated.subdomain }, replace: true });
+      }
       refreshSchoolData();
     },
   });
@@ -342,17 +357,21 @@ function SchoolDetailPage() {
               <SubscriptionBadge status={school.organization.subscriptionStatus} expiresAt={school.organization.expiresAt} />
             </div>
           </div>
-          <div className="flex gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-foreground">{school._count.students}</p>
-              <p className="text-xs text-muted-foreground/70">Students</p>
-            </div>
-            <div className="w-px bg-muted-foreground/20" />
-            <div>
-              <p className="text-2xl font-bold text-foreground">{school._count.teachers}</p>
-              <p className="text-xs text-muted-foreground/70">Teachers</p>
-            </div>
-          </div>
+          <dl className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+            {[
+              ["User accounts", school.userCounts?.total ?? school.organization.members.length],
+              ["Students", school._count.students],
+              ["Teachers", school._count.teachers],
+              ["Guardians", school._count.guardians ?? "—"],
+              ["Headteachers", school.userCounts?.headteachers ?? "—"],
+              ["Other staff", school._count.staff ?? "—"],
+            ].map(([label, count]) => (
+              <div key={label} className="rounded-lg border border-border bg-card px-3 py-2">
+                <dt className="text-xs text-muted-foreground">{label}</dt>
+                <dd className="text-xl font-semibold tabular-nums text-foreground">{count}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </div>
 

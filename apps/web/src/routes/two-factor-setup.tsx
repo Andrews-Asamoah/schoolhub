@@ -1,3 +1,4 @@
+import { PLATFORM_STAFF_ROLE } from "@schoolhub/shared";
 import { useLogout } from "@/hooks/use-logout";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LogOut, ShieldCheck } from "lucide-react";
@@ -29,7 +30,7 @@ function TwoFactorSetupPage() {
   }, [session, isPending, navigate]);
 
   function proceed() {
-    void navigate({ to: session?.user?.role === "superAdmin" ? "/admin/dashboard" : "/dashboard", replace: true });
+    void navigate({ to: session?.user?.role === PLATFORM_STAFF_ROLE ? "/admin/schools" : session?.user?.role === "superAdmin" ? "/admin/dashboard" : "/dashboard", replace: true });
   }
 
   const isSuperAdmin = audience === "super-admin" || session?.user?.role === "superAdmin";

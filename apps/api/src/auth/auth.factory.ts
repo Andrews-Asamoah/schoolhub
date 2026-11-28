@@ -10,6 +10,7 @@ import { isTemporaryPasswordExpired } from "../common/guards/password-change.js"
 import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  PLATFORM_STAFF_ROLE,
   passwordSchema,
 } from "@schoolhub/shared";
 
@@ -131,6 +132,12 @@ export function createAuth(prisma: PrismaLike) {
         if (headers?.get("x-schoolhub-client") === "desktop" && ctx.path !== "/sign-out") {
           const message = desktopVersionError(headers.get("x-schoolhub-client-version"));
           if (message) throw new APIError("UPGRADE_REQUIRED", { code: "DESKTOP_UPDATE_REQUIRED", message });
+        }
+        if (ctx.path.startsWith("/organization/")) {
+          const session = await getSessionFromCtx(ctx);
+          if ((session?.user as { role?: string } | undefined)?.role === PLATFORM_STAFF_ROLE) {
+            throw new APIError("FORBIDDEN", { message: "Platform staff can only use assigned school operations." });
+          }
         }
         if (ctx.path === "/send-verification-email") {
           const session = await getSessionFromCtx(ctx);
@@ -367,10 +374,11 @@ export function createAuth(prisma: PrismaLike) {
             if (account?.banned) {
               throw new APIError("FORBIDDEN", { message: "This account has been suspended." });
             }
-            if (account?.role === "superAdmin" && clientPlatform === "desktop") {
+            const platformAccount = account?.role === "superAdmin" || account?.role === PLATFORM_STAFF_ROLE;
+            if (platformAccount && clientPlatform === "desktop") {
               throw new APIError("FORBIDDEN", { code: "DESKTOP_SUPERADMIN_FORBIDDEN", message: "Platform administrators must use the web portal." });
             }
-            if (account?.role === "superAdmin") {
+            if (platformAccount) {
               const cap = new Date(Date.now() + SUPER_ADMIN_SESSION_SECONDS * 1000);
               const expiresAt =
                 session.expiresAt && session.expiresAt < cap ? session.expiresAt : cap;

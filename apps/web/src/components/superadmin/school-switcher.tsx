@@ -7,6 +7,7 @@ interface SchoolOption {
   id: string;
   name: string;
   code: string;
+  subdomain: string;
 }
 
 export function SchoolSwitcher() {
@@ -48,7 +49,7 @@ export function SchoolSwitcher() {
       >
         <option value="">Switch school…</option>
         {schools.data.map((school) => (
-          <option key={school.id} value={school.id}>
+          <option key={school.id} value={school.subdomain}>
             {school.name} · {school.code}
           </option>
         ))}

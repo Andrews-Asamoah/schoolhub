@@ -1,3 +1,4 @@
+import { PLATFORM_STAFF_ROLE } from "@schoolhub/shared";
 import { signInConnectionMessage } from "@/lib/platform/types";
 import { platform } from "@schoolhub/platform";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -87,6 +88,9 @@ function LoginPage() {
   const finishSignIn = useCallback((user: { role?: string | null; mustChangePassword?: boolean | null } | undefined) => {
     if (user?.mustChangePassword) {
       return navigate({ to: "/change-password", replace: true });
+    }
+    if (user?.role === PLATFORM_STAFF_ROLE) {
+      return navigate({ to: "/admin/schools", replace: true });
     }
     if (returnTo) {
       return navigate({ href: returnTo, replace: true });

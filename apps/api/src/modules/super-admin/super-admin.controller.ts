@@ -11,6 +11,7 @@ import {
   Header,
 } from "@nestjs/common";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
+import { PlatformTeamService } from "./platform-team.service.js";
 import { SuperAdminService } from "./super-admin.service.js";
 import { SuperAdminGuard } from "../../common/guards/super-admin.guard.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
@@ -19,6 +20,8 @@ import type { AuditActor } from "../../common/audit/audit.js";
 import { z } from "zod";
 import {
   enrollSchoolSchema,
+  PLATFORM_SCHOOL_ROLES,
+  type PlatformSchoolRole,
   updateSchoolSchema,
   addSchoolAdminSchema,
   setSchoolAdminBannedSchema,
@@ -68,7 +71,7 @@ const WRITE_LIMIT = { default: { limit: 30, ttl: 60_000 } };
 @Controller("super-admin")
 @UseGuards(ThrottlerGuard, SuperAdminGuard)
 export class SuperAdminController {
-  constructor(private readonly superAdminService: SuperAdminService) {}
+  constructor(private readonly superAdminService: SuperAdminService, private readonly team: PlatformTeamService) {}
 
 
   @Get("schools/:id/readiness")
@@ -153,6 +156,35 @@ export class SuperAdminController {
     return this.superAdminService.listUsers(query);
   }
 
+  @Post("users")
+  @Throttle(WRITE_LIMIT)
+  @Header("Cache-Control", "no-store")
+  invitePlatformStaff(
+    @Body(new ZodValidationPipe(z.object({ name: z.string().trim().min(2).max(100), email: z.email().trim().toLowerCase() })))
+    body: { name: string; email: string },
+    @AuditActorParam() actor: AuditActor,
+  ) {
+    return this.team.invite(body, actor);
+  }
+
+  @Patch("users/:userId/status")
+  @Throttle(WRITE_LIMIT)
+  async suspendPlatformStaff(@Param("userId") userId: string,
+    @Body(new ZodValidationPipe(z.object({ banned: z.boolean() }))) body: { banned: boolean },
+    @AuditActorParam() actor: AuditActor) {
+    await this.team.setSuspended(userId, body.banned, actor);
+    return { success: true };
+  }
+
+  @Patch("users/:userId/schools/:schoolId")
+  @Throttle(WRITE_LIMIT)
+  async assignPlatformSchool(@Param("userId") userId: string, @Param("schoolId") schoolId: string,
+    @Body(new ZodValidationPipe(z.object({ role: z.enum(PLATFORM_SCHOOL_ROLES).nullable() }))) body: { role: PlatformSchoolRole | null },
+    @AuditActorParam() actor: AuditActor) {
+    await this.team.setSchoolRole(userId, schoolId, body.role, actor);
+    return { success: true };
+  }
+
   @Get("audit-logs")
   @Header("Cache-Control", "no-store")
   listAuditLogs(
@@ -169,7 +201,7 @@ export class SuperAdminController {
 
   @Get("schools/:id")
   getSchool(@Param("id") id: string) {
-    return this.superAdminService.getSchool(id);
+    return this.superAdminService.getSchool(id, true);
   }
 
   @Patch("schools/:id")

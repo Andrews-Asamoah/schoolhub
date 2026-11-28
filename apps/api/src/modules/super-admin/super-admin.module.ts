@@ -1,3 +1,5 @@
+import { PlatformStaffController } from "./platform-staff.controller.js";
+import { PlatformTeamService } from "./platform-team.service.js";
 import { Module } from "@nestjs/common";
 import { SuperAdminController } from "./super-admin.controller.js";
 import { SuperAdminService } from "./super-admin.service.js";
@@ -7,7 +9,7 @@ import { StorageModule } from "../storage/storage.module.js";
 
 @Module({
   imports: [PrismaModule, AccountsModule, StorageModule],
-  controllers: [SuperAdminController],
-  providers: [SuperAdminService],
+  controllers: [SuperAdminController, PlatformStaffController],
+  providers: [SuperAdminService, PlatformTeamService],
 })
 export class SuperAdminModule {}

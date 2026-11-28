@@ -5,7 +5,7 @@ import type { IssuedCredentials } from "@schoolhub/shared";
 export interface CredentialEntry {
   /** Who the login belongs to, e.g. "Ama Mensah (student)". */
   label: string;
-  credentials: IssuedCredentials;
+  credentials: Pick<IssuedCredentials, "loginEmail" | "loginId" | "temporaryPassword">;
 }
 
 /**

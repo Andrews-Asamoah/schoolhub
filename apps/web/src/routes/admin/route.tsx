@@ -1,3 +1,5 @@
+import { PLATFORM_STAFF_ROLE } from "@schoolhub/shared";
+import { AssignedSchools } from "@/components/superadmin/assigned-schools";
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useSession } from "@/lib/auth-client";
 import { useEffect } from "react";
@@ -18,27 +20,32 @@ function AdminLayout() {
   const { data: session, isPending } = useSession();
   const navigate = useNavigate();
   const routerState = useRouterState();
+  const staff = session?.user?.role === PLATFORM_STAFF_ROLE;
+  const platformAccount = staff || session?.user?.role === "superAdmin";
+  const assignedRoute = routerState.location.pathname.replace(/\/$/, "") === "/admin/schools";
 
   // Bootstrap credentials must be replaced before the portal can render.
   // The API independently blocks business endpoints until the password is changed.
   const needsPasswordChange =
-    session?.user?.role === "superAdmin" && Boolean(session.user.mustChangePassword);
+    platformAccount && Boolean(session?.user.mustChangePassword);
 
   // Platform administrators must use two-factor authentication. This is only
   // the friendly redirect: the API refuses every /super-admin request without it.
   const needsTwoFactor =
-    session?.user?.role === "superAdmin" && !needsPasswordChange && !session.user.twoFactorEnabled;
+    platformAccount && !needsPasswordChange && !session?.user.twoFactorEnabled;
 
   useEffect(() => {
     if (isPending) return;
-    if (!session?.user || session.user.role !== "superAdmin") {
+    if (!session?.user || !platformAccount) {
       void navigate({ to: "/login", replace: true });
     } else if (needsPasswordChange) {
       void navigate({ to: "/change-password", replace: true });
     } else if (needsTwoFactor) {
       void navigate({ to: "/two-factor-setup", search: { audience: "super-admin" }, replace: true });
+    } else if (staff && !assignedRoute) {
+      void navigate({ to: "/admin/schools", replace: true });
     }
-  }, [session, isPending, navigate, needsPasswordChange, needsTwoFactor]);
+  }, [session, isPending, navigate, platformAccount, needsPasswordChange, needsTwoFactor, staff, assignedRoute]);
 
   if (isPending) {
     return (
@@ -54,12 +61,14 @@ function AdminLayout() {
   // While navigating away (unauthenticated), render nothing to avoid flash
   if (
     !session?.user ||
-    session.user.role !== "superAdmin" ||
+    !platformAccount ||
     needsPasswordChange ||
     needsTwoFactor
   ) {
     return null;
   }
+
+  if (staff) return assignedRoute ? <AssignedSchools /> : null;
 
   // Derive active page from live router location
   const pathname = routerState.location.pathname;
@@ -75,7 +84,7 @@ function AdminLayout() {
   const breadcrumb = {
     dashboard: "Dashboard",
     schools: "Schools",
-    users: "System users",
+    users: "Platform team",
     subscriptions: "Subscriptions",
     plans: "Subscription plans",
     support: "Support desk",

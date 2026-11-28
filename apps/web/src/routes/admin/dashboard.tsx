@@ -137,7 +137,7 @@ function AdminDashboard() {
       cell: (school) => (
         <Link
           to="/admin/schools/$schoolId"
-          params={{ schoolId: school.id }}
+          params={{ schoolId: school.subdomain }}
           className="superadmin-button-secondary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-primary transition hover:bg-primary/10 hover:text-primary"
         >
           View <ArrowRight className="size-3.5" />

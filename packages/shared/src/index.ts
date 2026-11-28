@@ -1148,12 +1148,20 @@ export const superAdminSchoolsQuerySchema = z.object({
 });
 export type SuperAdminSchoolsQuery = z.infer<typeof superAdminSchoolsQuerySchema>;
 
+export const PLATFORM_STAFF_ROLE = "platformStaff";
+export const PLATFORM_SCHOOL_ROLES = ["SUPPORT", "DESKTOP_ACCESS"] as const;
+export type PlatformSchoolRole = (typeof PLATFORM_SCHOOL_ROLES)[number];
+export const platformSchoolRoleLabels: Record<PlatformSchoolRole, string> = {
+  SUPPORT: "School support",
+  DESKTOP_ACCESS: "Desktop access manager",
+};
+
 export const superAdminUsersQuerySchema = z.object({
   page: pageQuery,
   limit: limitQuery,
   q: searchQuery,
   schoolId: z.string().trim().max(64).optional(),
-  role: z.string().trim().max(40).optional(),
+  role: z.enum(PLATFORM_SCHOOL_ROLES).optional(),
 });
 export type SuperAdminUsersQuery = z.infer<typeof superAdminUsersQuerySchema>;
 

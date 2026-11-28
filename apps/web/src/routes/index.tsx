@@ -1,3 +1,4 @@
+import { PLATFORM_STAFF_ROLE } from "@schoolhub/shared";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSession } from "@/lib/auth-client";
 import { useEffect } from "react";
@@ -21,6 +22,8 @@ function IndexRedirect() {
     if (isPending) return;
     if (!session?.user) {
       void navigate({ to: "/login" });
+    } else if (session.user.role === PLATFORM_STAFF_ROLE) {
+      void navigate({ to: "/admin/schools" });
     } else if (session.user.role === "superAdmin") {
       void navigate({ to: "/admin/dashboard" });
     } else {
